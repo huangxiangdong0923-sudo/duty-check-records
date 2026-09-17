@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1E5AA8">
+  <title>值日扣分记录</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>值日扣分记录</h1>
+    <nav class="tabs" aria-label="页面切换">
+      <button type="button" class="tab is-active" data-tab="entry">录入</button>
+      <button type="button" class="tab" data-tab="summary">汇总</button>
+      <button type="button" class="tab" data-tab="history">历史与备份</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="panel-entry" class="panel is-active">
+      <form id="entry-form" novalidate>
+        <label>日期
+          <input id="f-date" name="date" type="date" required>
+        </label>
+        <label>年级
+          <select id="f-grade" name="grade" required></select>
+        </label>
+        <label>班级
+          <select id="f-class" name="classNo" required></select>
+        </label>
+
+        <fieldset>
+          <legend>填写位置方式</legend>
+          <label><input type="radio" name="locationType" value="seat" checked> 第几排第几个</label>
+          <label><input type="radio" name="locationType" value="student"> 学生姓名</label>
+        </fieldset>
+
+        <div id="seat-fields">
+          <label>第几排（竖着数）
+            <input id="f-row" name="row" type="number" min="1" step="1">
+          </label>
+          <label>第几个（竖着数）
+            <input id="f-seat" name="seat" type="number" min="1" step="1">
+          </label>
+        </div>
+
+        <div id="student-fields" hidden>
+          <label>学生姓名
+            <input id="f-student" name="studentName" type="text" maxlength="20">
+          </label>
+        </div>
+
+        <label>检查时间
+          <select id="f-slot" name="slot" required></select>
+        </label>
+
+        <div id="reason-grid" class="reason-grid" aria-label="扣分原因"></div>
+
+        <label>分值
+          <input id="f-points" name="points" type="number" min="1" step="1" value="1" required>
+        </label>
+        <label>备注
+          <textarea id="f-note" name="note" rows="2" maxlength="80"></textarea>
+        </label>
+        <p id="entry-message" class="message" role="status"></p>
+        <button id="save-record" type="submit" class="primary">保存记录</button>
+      </form>
+      <h2>今日记录</h2>
+      <div id="today-list" class="record-list"></div>
+    </section>
+
+    <section id="panel-summary" class="panel">
+      <label>汇总日期
+        <input id="summary-date" type="date">
+      </label>
+      <div id="summary-total" class="summary-total"></div>
+      <p id="summary-message" class="message" role="status"></p>
+      <button id="export-image" type="button" class="primary">导出当天图片</button>
+      <div id="summary-groups" class="summary-groups"></div>
+    </section>
+
+    <section id="panel-history" class="panel">
+      <h2>历史日期</h2>
+      <div id="history-list" class="record-list"></div>
+      <h2>备份</h2>
+      <button id="export-backup" type="button">导出 JSON 备份</button>
+      <label>导入方式
+        <select id="import-mode">
+          <option value="merge" selected>合并导入</option>
+          <option value="replace">覆盖本机数据</option>
+        </select>
+      </label>
+      <label>选择备份文件
+        <input id="import-file" type="file" accept="application/json,.json">
+      </label>
+      <p id="history-message" class="message" role="status"></p>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
