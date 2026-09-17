@@ -1,6 +1,8 @@
 import { SLOTS, getReasonsForSlot } from './js/reasons.js';
 import { classCountForGrade, createRecord } from './js/records.js';
 import { loadRecords, saveRecords } from './js/storage.js';
+import { summarize, getTotals } from './js/summary.js';
+import { renderSummaryBlob, downloadBlob } from './js/image-export.js';
 
 const state = { records: loadRecords(), selectedReasonCode: null };
 
@@ -125,6 +127,43 @@ function switchTab(tabName) {
   if (tabName === 'history') window.dispatchEvent(new CustomEvent('app:history'));
 }
 
+function renderSummary() {
+  const date = $('summary-date').value || todayIso();
+  const groups = summarize(state.records, date);
+  const totals = getTotals(groups);
+  $('summary-total').textContent = groups.length
+    ? `当天合计：${totals.totalPoints}分 · ${totals.classCount}个班级 · ${totals.entryCount}条记录`
+    : '当天没有扣分记录';
+  $('summary-message').textContent = '';
+  const container = $('summary-groups');
+  container.innerHTML = '';
+  for (const group of groups) {
+    const card = document.createElement('section');
+    card.className = 'summary-class';
+    card.innerHTML = `<h3>${group.label}（${group.totalPoints}分）</h3>`;
+    for (const entry of group.entries) {
+      const line = document.createElement('div');
+      line.className = 'summary-entry';
+      const location = entry.locationType === 'student' ? entry.studentName : `第${entry.row}排第${entry.seat}个`;
+      line.innerHTML = `<span>${location} · ${entry.reasonLabel}</span><span class="points">-${entry.points}分</span>`;
+      card.appendChild(line);
+    }
+    container.appendChild(card);
+  }
+}
+
+async function exportSummaryImage() {
+  const date = $('summary-date').value || todayIso();
+  const groups = summarize(state.records, date);
+  if (!groups.length) {
+    $('summary-message').textContent = '当天没有扣分记录，暂不能导出图片。';
+    return;
+  }
+  const blob = await renderSummaryBlob(state.records, date);
+  downloadBlob(blob, `${date}-值日检查扣分情况.png`);
+  $('summary-message').textContent = '图片已生成并开始下载。';
+}
+
 function initEntry() {
   fillGradeOptions();
   fillClassOptions();
@@ -142,6 +181,9 @@ function initEntry() {
   });
   document.querySelectorAll('input[name="locationType"]').forEach((input) => input.addEventListener('change', updateLocationFields));
   $('f-date').addEventListener('change', renderTodayList);
+  $('summary-date').addEventListener('change', renderSummary);
+  $('export-image').addEventListener('click', exportSummaryImage);
+  window.addEventListener('app:summary', renderSummary);
   $('entry-form').addEventListener('submit', (event) => {
     event.preventDefault();
     const message = $('entry-message');
@@ -160,7 +202,8 @@ function initEntry() {
     }
   });
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
+  renderSummary();
 }
 
 initEntry();
-export { state, switchTab };
+export { state, switchTab, renderSummary };
