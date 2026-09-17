@@ -1,6 +1,6 @@
 import { SLOTS, getReasonsForSlot } from './js/reasons.js';
 import { classCountForGrade, createRecord } from './js/records.js';
-import { loadRecords, saveRecords } from './js/storage.js';
+import { loadRecords, saveRecords, createBackup, importBackup } from './js/storage.js';
 import { summarize, getTotals } from './js/summary.js';
 import { renderSummaryBlob, downloadBlob } from './js/image-export.js';
 
@@ -164,6 +164,56 @@ async function exportSummaryImage() {
   $('summary-message').textContent = '图片已生成并开始下载。';
 }
 
+function renderHistory() {
+  const dates = Array.from(new Set(state.records.map((record) => record.date))).sort().reverse();
+  const container = $('history-list');
+  container.innerHTML = '';
+  if (!dates.length) {
+    container.textContent = '还没有历史记录。';
+    return;
+  }
+  for (const date of dates) {
+    const count = state.records.filter((record) => record.date === date).length;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'record-item';
+    button.textContent = `${date}　${count} 条记录`;
+    button.addEventListener('click', () => {
+      $('summary-date').value = date;
+      renderSummary();
+      switchTab('summary');
+    });
+    container.appendChild(button);
+  }
+}
+
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(createBackup(state.records), null, 2)], { type: 'application/json' });
+  downloadBlob(blob, `值日扣分备份-${todayIso()}.json`);
+  $('history-message').textContent = '备份文件已生成。';
+}
+
+async function importBackupFile(file) {
+  const text = await file.text();
+  const mode = $('import-mode').value;
+  if (mode === 'replace') {
+    if (!confirm('覆盖会删除本机现有记录，确定继续吗？')) return;
+    const parsed = JSON.parse(text);
+    if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.records)) throw new Error('备份文件格式不正确');
+    state.records = parsed.records;
+    saveRecords(state.records);
+    $('history-message').textContent = `已覆盖导入 ${state.records.length} 条记录。`;
+  } else {
+    const result = importBackup(text, state.records);
+    state.records = result.records;
+    saveRecords(state.records);
+    $('history-message').textContent = `合并完成：新增 ${result.added} 条，跳过 ${result.skipped} 条重复记录。`;
+  }
+  renderHistory();
+  renderTodayList();
+  renderSummary();
+}
+
 function initEntry() {
   fillGradeOptions();
   fillClassOptions();
@@ -184,6 +234,19 @@ function initEntry() {
   $('summary-date').addEventListener('change', renderSummary);
   $('export-image').addEventListener('click', exportSummaryImage);
   window.addEventListener('app:summary', renderSummary);
+  $('export-backup').addEventListener('click', exportBackup);
+  $('import-file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      await importBackupFile(file);
+    } catch (error) {
+      $('history-message').textContent = error.message;
+    } finally {
+      event.target.value = '';
+    }
+  });
+  window.addEventListener('app:history', renderHistory);
   $('entry-form').addEventListener('submit', (event) => {
     event.preventDefault();
     const message = $('entry-message');
@@ -203,7 +266,8 @@ function initEntry() {
   });
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   renderSummary();
+  renderHistory();
 }
 
 initEntry();
-export { state, switchTab, renderSummary };
+export { state, switchTab, renderSummary, renderHistory };
