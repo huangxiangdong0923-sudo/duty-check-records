@@ -6,7 +6,7 @@
 
 **Architecture:** Plain HTML/CSS/JavaScript ES modules with no build step. Browser localStorage stores records. Pure logic modules are tested with Node's built-in test runner. Canvas renders the PNG export. A service worker and manifest make the site installable and usable offline.
 
-**Tech Stack:** HTML, CSS, browser JavaScript ES modules, localStorage, Canvas, Service Worker, Node 24 built-in test runner, Python 3 and Pillow only for generating app icons.
+**Tech Stack:** HTML, CSS, browser JavaScript ES modules, localStorage, Canvas, Service Worker, Node 24 built-in test runner, bundled Python 3 and Pillow only for generating app icons.
 
 ## Global Constraints
 
@@ -1531,11 +1531,11 @@ for size in (192, 512):
     image.save(f"icons/icon-{size}.png")
 ```
 
-Run:
+Run with the bundled Python executable:
 
 ```bash
 mkdir -p icons
-python3 scripts/make_icons.py
+/Users/huangxiangdong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/make_icons.py
 ```
 
 - [ ] **Step 4: Register the service worker**
