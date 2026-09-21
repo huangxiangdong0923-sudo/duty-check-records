@@ -1,13 +1,8 @@
 import { SLOTS, getReasonsForSlot, getReasonByCode } from './reasons.js';
+import { DEFAULT_CAMPUS, groundOfGrade } from './campuses.js';
 
-export const GROUNDS = [
-  { code: 'jinlun', label: '金轮操场', gradesLabel: '一、四年级', grades: [1, 4] },
-  { code: 'yuetu', label: '玉兔操场', gradesLabel: '二、三年级', grades: [2, 3] },
-];
-
-export function groundForGrade(grade) {
-  const value = Number(grade);
-  return GROUNDS.find((ground) => ground.grades.includes(value)) || null;
+export function groundForGrade(grade, campus = DEFAULT_CAMPUS) {
+  return groundOfGrade(campus, grade);
 }
 
 export const FLAG_SLOT = { code: 'flag', label: '升旗仪式' };

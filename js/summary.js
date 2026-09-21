@@ -1,6 +1,7 @@
-import { GROUNDS, FLAG_REASONS, groundForGrade } from './modules.js';
+import { FLAG_REASONS, groundForGrade } from './modules.js';
+import { getCampus } from './campuses.js';
 
-const GRADE_LABELS = { 1: '一年级', 2: '二年级', 3: '三年级', 4: '四年级' };
+const GRADE_LABELS = { 1: '一年级', 2: '二年级', 3: '三年级', 4: '四年级', 5: '五年级', 6: '六年级' };
 
 function moduleOf(record) {
   return record?.module === 'flag' ? 'flag' : 'daily';
@@ -76,7 +77,8 @@ export function summarizeFlag(records, date) {
   let entryCount = 0;
   for (const record of filtered) {
     entryCount += 1;
-    const ground = groundForGrade(record.grade) || { code: 'unknown', label: '未分组', gradesLabel: '' };
+    const campus = getCampus(record.campus);
+    const ground = groundForGrade(record.grade, campus) || { code: 'unknown', label: '未分组', gradesLabel: '' };
     if (!groundMap.has(ground.code)) {
       groundMap.set(ground.code, { code: ground.code, label: ground.label, gradesLabel: ground.gradesLabel, totalPoints: 0, classMap: new Map() });
     }
@@ -115,7 +117,10 @@ export function summarizeFlag(records, date) {
     item.count += 1;
   }
 
-  const groundOrder = [...GROUNDS.map((ground) => ground.code), 'unknown'];
+  const campusIds = Array.from(new Set(filtered.map((record) => getCampus(record.campus).id)));
+  const groundOrder = campusIds
+    .flatMap((campusId) => getCampus(campusId).grounds.map((ground) => ground.code))
+    .concat('unknown');
   const grounds = Array.from(groundMap.values())
     .sort((a, b) => groundOrder.indexOf(a.code) - groundOrder.indexOf(b.code))
     .map((ground) => ({

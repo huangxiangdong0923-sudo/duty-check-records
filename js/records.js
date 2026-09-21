@@ -1,12 +1,10 @@
 import { getReasonForModule, getSlotsForModule } from './modules.js';
-
-const GRADE_MIN = 1;
-const GRADE_MAX = 4;
+import { DEFAULT_CAMPUS, classCountOf, getCampus } from './campuses.js';
 
 export const MAX_STUDENT_NOS = 20;
 
-export function classCountForGrade(grade) {
-  return Number(grade) === 4 ? 23 : 18;
+export function classCountForGrade(grade, campus = DEFAULT_CAMPUS) {
+  return classCountOf(campus, grade);
 }
 
 export function makeId() {
@@ -54,6 +52,7 @@ export function defaultPointsFor(studentNos) {
 export function normalizeRecord(input) {
   return {
     id: String(input.id || makeId()),
+    campus: getCampus(input.campus).id,
     module: moduleOf(input.module),
     date: String(input.date || ''),
     grade: Number(input.grade),
@@ -76,11 +75,12 @@ export function normalizeRecord(input) {
 export function validateDraft(draft) {
   const errors = [];
   const moduleId = moduleOf(draft.module);
+  const campus = getCampus(draft.campus);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(draft.date || ''))) errors.push('日期格式应为 YYYY-MM-DD');
-  if (!Number.isInteger(Number(draft.grade)) || Number(draft.grade) < GRADE_MIN || Number(draft.grade) > GRADE_MAX) {
-    errors.push('年级必须是一至四年级');
+  if (!campus.grades.includes(Number(draft.grade))) {
+    errors.push(`${campus.label}的年级只能是${campus.grades.map((grade) => `${grade}年级`).join('、')}`);
   }
-  const maxClass = classCountForGrade(Number(draft.grade));
+  const maxClass = classCountForGrade(Number(draft.grade), campus);
   if (!Number.isInteger(Number(draft.classNo)) || Number(draft.classNo) < 1 || Number(draft.classNo) > maxClass) {
     errors.push(`班级必须是 1-${maxClass} 班`);
   }

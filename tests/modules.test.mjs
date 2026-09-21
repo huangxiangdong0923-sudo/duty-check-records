@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GROUNDS,
   MODULES,
   FLAG_REASONS,
   getModule,
@@ -10,6 +9,9 @@ import {
   getSlotsForModule,
   groundForGrade,
 } from '../js/modules.js';
+import { CAMPUSES, DEFAULT_CAMPUS, getCampus, detectCampusId } from '../js/campuses.js';
+
+const EAST_GROUNDS = getCampus('east').grounds;
 
 test('grade 1 and 4 belong to JInlun playground', () => {
   assert.equal(groundForGrade(1).code, 'jinlun');
@@ -29,8 +31,10 @@ test('unknown grade has no playground', () => {
 });
 
 test('each grade appears in exactly one playground', () => {
-  const assigned = GROUNDS.flatMap((ground) => ground.grades);
-  assert.deepEqual([...assigned].sort(), [1, 2, 3, 4]);
+  for (const campus of CAMPUSES) {
+    const assigned = campus.grounds.flatMap((ground) => ground.grades);
+    assert.deepEqual([...assigned].sort((a, b) => a - b), campus.grades.slice().sort((a, b) => a - b), campus.id);
+  }
 });
 
 test('flag module keeps the ten fixed checks the school listed', () => {
@@ -63,4 +67,26 @@ test('daily module keeps working through the module lookup helpers', () => {
 test('unknown module id falls back to daily', () => {
   assert.equal(getModule('nope').id, 'daily');
   assert.deepEqual(MODULES.map((module) => module.id), ['daily', 'flag']);
+});
+
+test('东校区 covers grades 1-4 across two playgrounds', () => {
+  assert.deepEqual(DEFAULT_CAMPUS.grades, [1, 2, 3, 4]);
+  assert.deepEqual(EAST_GROUNDS.map((ground) => ground.code), ['jinlun', 'yuetu']);
+});
+
+test('南校区 has one playground for grades 5 and 6', () => {
+  const south = getCampus('south');
+  assert.deepEqual(south.grades, [5, 6]);
+  assert.equal(south.grounds.length, 1);
+  assert.deepEqual(south.grounds[0].grades, [5, 6]);
+  assert.equal(groundForGrade(5, south).code, 'south-field');
+  assert.equal(groundForGrade(6, south).code, 'south-field');
+  assert.equal(groundForGrade(4, south), null);
+});
+
+test('campus detection reads the URL path', () => {
+  assert.equal(detectCampusId('/duty-check-records/'), 'east');
+  assert.equal(detectCampusId('/duty-check-records/index.html'), 'east');
+  assert.equal(detectCampusId('/duty-check-records/campus/south/'), 'south');
+  assert.equal(detectCampusId('/duty-check-records/campus/south/index.html'), 'south');
 });

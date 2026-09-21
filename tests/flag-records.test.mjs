@@ -89,6 +89,23 @@ test('normalizeRecord keeps old daily records readable', () => {
   });
   assert.equal(record.module, 'daily');
   assert.deepEqual(record.studentNos, []);
+  assert.equal(record.campus, 'east');
+});
+
+test('南校区 draft accepts grade 5 and rejects grade 4', () => {
+  const southDraft = { ...baseFlagDraft, campus: 'south', grade: 5, classNo: 3, studentNos: '1 2', points: 2 };
+  assert.equal(validateDraft(southDraft).valid, true);
+  assert.equal(validateDraft({ ...southDraft, grade: 4 }).valid, false);
+  assert.equal(validateDraft({ ...southDraft, grade: 5, classNo: 99 }).valid, false);
+});
+
+test('南校区 record keeps its campus', () => {
+  const record = createRecord({ ...baseFlagDraft, campus: 'south', grade: 6, classNo: 2 }, {
+    now: () => '2026-09-21T01:00:00.000Z',
+    idFactory: () => 'south-1',
+  });
+  assert.equal(record.campus, 'south');
+  assert.equal(record.grade, 6);
 });
 
 test('records saved by the previous version still load', () => {

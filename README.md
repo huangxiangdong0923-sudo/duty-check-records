@@ -4,11 +4,27 @@
 
 ## 在线地址
 
-<https://huangxiangdong0923-sudo.github.io/duty-check-records/>
+| 校区 | 链接 | 年级 | 操场 |
+| --- | --- | --- | --- |
+| 东校区 | <https://huangxiangdong0923-sudo.github.io/duty-check-records/> | 一至四年级 | 金轮操场（一、四）、玉兔操场（二、三） |
+| 南校区 | <https://huangxiangdong0923-sudo.github.io/duty-check-records/campus/south/> | 五、六年级 | 操场（五、六） |
+
+两个校区是同一套代码、两份配置，链接不同、数据互不相通，各自老师各用各的。
 
 手机上打开链接后，用 Safari 的「分享 → 添加到主屏幕」或 Chrome 的「添加到主屏幕」，就能像 App 一样打开。
 
 数据只存在当前这台设备上，换设备不会自动同步，用「历史与备份」里的 JSON 导出/导入来搬。
+
+## 校区配置
+
+各校区的年级、班级数、操场划分都在 `js/campuses.js`。改完后跑：
+
+```sh
+npm run build:campuses   # 重新生成 campus/<校区>/ 入口页与 manifest
+npm test                 # 测试会校验生成结果是否和模板一致
+```
+
+要加第三个校区，在 `js/campuses.js` 里加一条配置，再跑一次上面两条命令即可。
 
 ## 两个模块
 

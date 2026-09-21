@@ -1,11 +1,15 @@
-const CACHE = 'duty-deduction-v2';
+const CACHE = 'duty-deduction-v3';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './manifest.webmanifest',
+  './campus/south/index.html',
+  './campus/south/',
+  './campus/south/manifest.webmanifest',
   './js/reasons.js',
+  './js/campuses.js',
   './js/modules.js',
   './js/dates.js',
   './js/records.js',
@@ -17,7 +21,9 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => Promise.all(ASSETS.map((asset) => cache.add(asset).catch(() => null)))),
+  );
 });
 
 self.addEventListener('activate', (event) => {

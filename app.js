@@ -4,8 +4,11 @@ import { loadRecords, saveRecords, createBackup, importBackup } from './js/stora
 import { summarize, getTotals, summarizeFlag, flagItemLocationText } from './js/summary.js';
 import { renderSummaryBlob, downloadBlob } from './js/image-export.js';
 import { todayIso, lastMondayIso } from './js/dates.js';
+import { DEFAULT_CAMPUS, detectCampusId, filterByCampus, getCampus } from './js/campuses.js';
 
-const GRADE_LABELS = ['', '一年级', '二年级', '三年级', '四年级'];
+const GRADE_LABELS = ['', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级'];
+const CAMPUS = getCampus(detectCampusId());
+const APP_NAME = CAMPUS.id === DEFAULT_CAMPUS.id ? '值日检查记录' : `值日检查记录（${CAMPUS.label}）`;
 
 const state = {
   records: loadRecords(),
@@ -32,6 +35,10 @@ function moduleOf(record) {
   return record?.module === 'flag' ? 'flag' : 'daily';
 }
 
+function campusRecords() {
+  return filterByCampus(state.records, CAMPUS.id);
+}
+
 function defaultDateFor(moduleId) {
   return moduleId === 'flag' ? lastMondayIso() : todayIso();
 }
@@ -43,7 +50,7 @@ function classLabel(grade, classNo) {
 function fillGradeOptions() {
   const select = $('f-grade');
   select.innerHTML = '';
-  for (const grade of [1, 2, 3, 4]) {
+  for (const grade of CAMPUS.grades) {
     const option = document.createElement('option');
     option.value = String(grade);
     option.textContent = GRADE_LABELS[grade];
@@ -52,10 +59,10 @@ function fillGradeOptions() {
 }
 
 function fillClassOptions() {
-  const grade = Number($('f-grade').value || 1);
+  const grade = Number($('f-grade').value || CAMPUS.grades[0]);
   const select = $('f-class');
   select.innerHTML = '';
-  for (let classNo = 1; classNo <= classCountForGrade(grade); classNo += 1) {
+  for (let classNo = 1; classNo <= classCountForGrade(grade, CAMPUS); classNo += 1) {
     const option = document.createElement('option');
     option.value = String(classNo);
     option.textContent = `${classNo}班`;
@@ -82,7 +89,7 @@ function updateGroundChip() {
     chip.textContent = '';
     return;
   }
-  const ground = groundForGrade($('f-grade').value);
+  const ground = groundForGrade($('f-grade').value, CAMPUS);
   chip.hidden = false;
   chip.textContent = ground ? `检查地点：${ground.label}（${ground.gradesLabel}）` : '检查地点：未确定';
 }
@@ -134,6 +141,7 @@ function formDraft() {
   const isFlag = state.moduleId === 'flag';
   const locationType = isFlag ? 'studentNo' : document.querySelector('input[name="locationType"]:checked').value;
   return {
+    campus: CAMPUS.id,
     module: state.moduleId,
     date: $('f-date').value,
     grade: Number($('f-grade').value),
@@ -161,7 +169,7 @@ function locationText(record) {
 
 function renderTodayList() {
   const date = $('f-date').value || todayIso();
-  const records = state.records
+  const records = campusRecords()
     .filter((record) => record.date === date && moduleOf(record) === state.moduleId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const list = $('today-list');
@@ -242,7 +250,7 @@ function renderSummary() {
   setMessage('summary-message', '');
 
   if (state.moduleId === 'flag') {
-    const { grounds, totals } = summarizeFlag(state.records, date);
+    const { grounds, totals } = summarizeFlag(campusRecords(), date);
     $('summary-total').textContent = totals.entryCount
       ? `当天合计：${totals.totalPoints}分 · ${totals.classCount}个班级 · ${totals.entryCount}条记录`
       : '当天没有扣分记录';
@@ -258,7 +266,7 @@ function renderSummary() {
     return;
   }
 
-  const groups = summarize(state.records, date, 'daily');
+  const groups = summarize(campusRecords(), date, 'daily');
   const totals = getTotals(groups);
   $('summary-total').textContent = groups.length
     ? `当天合计：${totals.totalPoints}分 · ${totals.classCount}个班级 · ${totals.entryCount}条记录`
@@ -286,12 +294,12 @@ function renderSummary() {
 
 async function exportSummaryImage() {
   const date = $('summary-date').value || todayIso();
-  const hasRecords = state.records.some((record) => record.date === date && moduleOf(record) === state.moduleId);
+  const hasRecords = campusRecords().some((record) => record.date === date && moduleOf(record) === state.moduleId);
   if (!hasRecords) {
     setMessage('summary-message', '当天没有扣分记录，暂不能导出图片。');
     return;
   }
-  const blob = await renderSummaryBlob(state.records, date, state.moduleId);
+  const blob = await renderSummaryBlob(campusRecords(), date, state.moduleId);
   if (!blob) {
     setMessage('summary-message', '图片生成失败，请重试。');
     return;
@@ -302,7 +310,7 @@ async function exportSummaryImage() {
 
 function renderHistory() {
   const dates = Array.from(new Set(
-    state.records.filter((record) => moduleOf(record) === state.moduleId).map((record) => record.date),
+    campusRecords().filter((record) => moduleOf(record) === state.moduleId).map((record) => record.date),
   )).sort().reverse();
   const container = $('history-list');
   container.innerHTML = '';
@@ -311,7 +319,7 @@ function renderHistory() {
     return;
   }
   for (const date of dates) {
-    const count = state.records.filter((record) => record.date === date && moduleOf(record) === state.moduleId).length;
+    const count = campusRecords().filter((record) => record.date === date && moduleOf(record) === state.moduleId).length;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'record-item';
@@ -361,6 +369,8 @@ function resetEntryForm() {
 }
 
 function initEntry() {
+  document.title = APP_NAME;
+  $('app-title').textContent = APP_NAME;
   fillGradeOptions();
   fillClassOptions();
   fillSlotOptions();
@@ -434,7 +444,8 @@ export { state, switchTab, switchModule, renderSummary, renderHistory, renderTod
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((error) => {
+    const serviceWorkerUrl = new URL('./sw.js', import.meta.url);
+    navigator.serviceWorker.register(serviceWorkerUrl).catch((error) => {
       console.warn('Service worker registration failed', error);
     });
   });

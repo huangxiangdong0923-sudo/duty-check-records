@@ -11,7 +11,7 @@ function memoryStorage() {
 }
 
 const record = {
-  id: 'r1', module: 'daily', date: '2026-09-17', grade: 3, classNo: 1,
+  id: 'r1', campus: 'east', module: 'daily', date: '2026-09-17', grade: 3, classNo: 1,
   locationType: 'seat', row: 3, seat: 4, studentName: '', studentNos: [],
   slot: 'morning', reasonCode: 'floor-garbage-am',
   reasonLabel: '地面有比拳头大的垃圾、水杯或绳子', points: 1, note: '',
