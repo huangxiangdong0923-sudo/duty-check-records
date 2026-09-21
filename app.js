@@ -1,11 +1,12 @@
 import { getModule, getSlotsForModule, getReasonsForModule, groundForGrade } from './js/modules.js';
 import { classCountForGrade, createRecord, defaultPointsFor, parseStudentNos } from './js/records.js';
-import { loadRecords, saveRecords, createBackup, importBackup } from './js/storage.js';
+import { loadRecords, saveRecords, createBackup, importBackup, loadTombstones, saveTombstones, addTombstone } from './js/storage.js';
 import { summarize, getTotals, summarizeFlag, flagItemLocationText } from './js/summary.js';
 import { renderSummaryBlob, renderRatingBlob, downloadBlob } from './js/image-export.js';
 import { todayIso, lastMondayIso, formatChipDateWithWeekday } from './js/dates.js';
 import { DEFAULT_CAMPUS, detectCampusId, filterByCampus, getCampus } from './js/campuses.js';
 import { rateWeek } from './js/rating.js';
+import { hasSyncToken, loadSyncSettings, saveSyncSettings, syncNow, formatClock } from './js/sync.js';
 import { APP_VERSION, APP_UPDATED_AT } from './js/version.js';
 
 const GRADE_LABELS = ['', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级'];
@@ -14,6 +15,10 @@ const APP_NAME = CAMPUS.id === DEFAULT_CAMPUS.id ? '值日检查记录' : `值�
 
 const state = {
   records: loadRecords(),
+  tombstones: loadTombstones(),
+  syncSettings: loadSyncSettings(),
+  syncing: false,
+  syncError: '',
   moduleId: 'daily',
   selectedReasonCode: null,
   pointsDirty: false,
@@ -191,11 +196,13 @@ function renderTodayList() {
     remove.addEventListener('click', () => {
       if (!confirm('确定删除这条记录吗？')) return;
       state.records = state.records.filter((candidate) => candidate.id !== record.id);
+      state.tombstones = saveTombstones(addTombstone(state.tombstones, record.id));
       saveRecords(state.records);
       renderTodayList();
       renderSummary();
       renderRating();
       renderHistory();
+      scheduleSync();
     });
     item.append(content, remove);
     list.appendChild(item);
@@ -445,6 +452,99 @@ async function importBackupFile(file) {
   renderTodayList();
   renderSummary();
   renderRating();
+  scheduleSync();
+}
+
+let syncTimer = null;
+
+function paintSyncChip() {
+  const chip = $('sync-chip');
+  chip.hidden = false;
+  if (!hasSyncToken(state.syncSettings)) {
+    chip.textContent = '云同步：未开启（数据只在本机）';
+    chip.dataset.tone = 'off';
+    return;
+  }
+  if (state.syncing) {
+    chip.textContent = '云同步：同步中…';
+    chip.dataset.tone = 'busy';
+    return;
+  }
+  if (state.syncError) {
+    chip.textContent = '云同步：失败（数据仍在本机）';
+    chip.dataset.tone = 'error';
+    return;
+  }
+  const at = formatClock(state.syncSettings.lastSyncedAt);
+  chip.textContent = at ? `云同步：已同步 ${at}` : '云同步：已开启（待首次同步）';
+  chip.dataset.tone = at ? 'ok' : 'busy';
+}
+
+function refreshAfterSync() {
+  renderTodayList();
+  renderSummary();
+  renderRating();
+  renderHistory();
+}
+
+let syncInFlight = null;
+
+async function performCloudSync({ silent = false } = {}) {
+  if (!hasSyncToken(state.syncSettings)) {
+    if (!silent) setMessage('sync-status', '还没有粘贴令牌，怎么设置可以问我。');
+    paintSyncChip();
+    return null;
+  }
+  state.syncing = true;
+  paintSyncChip();
+  if (!silent) setMessage('sync-status', '正在同步…');
+  try {
+    const result = await syncNow({
+      settings: state.syncSettings,
+      local: { records: state.records, deletedIds: state.tombstones },
+    });
+    state.tombstones = saveTombstones(result.deletedIds);
+    state.records = result.records;
+    saveRecords(state.records);
+    state.syncSettings = saveSyncSettings({ ...state.syncSettings, lastSyncedAt: new Date().toISOString() });
+    state.syncError = '';
+    const at = formatClock(state.syncSettings.lastSyncedAt);
+    setMessage(
+      'sync-status',
+      `同步完成（${at}）：本机现有 ${state.records.length} 条记录${result.uploaded ? '，已上传' : ''}。`,
+      true,
+    );
+    if (result.changedLocally) refreshAfterSync();
+  } catch (error) {
+    state.syncError = error.message;
+    setMessage('sync-status', `同步失败：${error.message}`);
+    console.warn('Sync failed', error);
+  } finally {
+    state.syncing = false;
+    if (hasSyncToken(state.syncSettings)) paintSyncChip();
+  }
+}
+
+// 手动点「立即同步」时，如果正好有一次自动同步在跑，等它结束后再同步一次，避免点击没反应。
+async function runCloudSync(options = {}) {
+  if (syncInFlight) {
+    if (options.silent) return syncInFlight;
+    setMessage('sync-status', '正在同步，请稍等…');
+    await syncInFlight;
+    return runCloudSync({ ...options });
+  }
+  syncInFlight = performCloudSync(options).finally(() => {
+    syncInFlight = null;
+  });
+  return syncInFlight;
+}
+
+function scheduleSync(delay = 1500) {
+  if (!hasSyncToken(state.syncSettings)) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    void runCloudSync({ silent: true });
+  }, delay);
 }
 
 function resetEntryForm() {
@@ -501,6 +601,29 @@ function initEntry() {
   $('export-rating').addEventListener('click', exportRatingImage);
   $('export-backup').addEventListener('click', exportBackup);
   $('check-update').addEventListener('click', checkForUpdate);
+  $('sync-save').addEventListener('click', async () => {
+    const token = $('sync-token').value.trim();
+    if (!token) {
+      setMessage('sync-status', '请先粘贴 GitHub 令牌。');
+      return;
+    }
+    state.syncSettings = saveSyncSettings({ ...state.syncSettings, token });
+    state.syncError = '';
+    $('sync-token').value = '';
+    $('sync-token').placeholder = '已保存令牌（要更换就粘贴新的）';
+    await runCloudSync();
+  });
+  $('sync-now').addEventListener('click', () => {
+    void runCloudSync();
+  });
+  $('sync-clear').addEventListener('click', () => {
+    if (!confirm('清除令牌后这台设备不再自动同步，本机记录仍然保留。确定吗？')) return;
+    state.syncSettings = saveSyncSettings({ ...state.syncSettings, token: '', lastSyncedAt: '' });
+    state.syncError = '';
+    $('sync-token').placeholder = '粘贴 GitHub 令牌';
+    setMessage('sync-status', '已清除令牌，本机记录不受影响。');
+    paintSyncChip();
+  });
   $('import-file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -524,11 +647,21 @@ function initEntry() {
       renderSummary();
       renderRating();
       renderHistory();
+      scheduleSync();
     } catch (error) {
       setMessage('entry-message', error.message);
     }
   });
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
+  if (hasSyncToken(state.syncSettings)) {
+    $('sync-token').placeholder = '已保存令牌（要更换就粘贴新的）';
+  }
+  paintSyncChip();
+  scheduleSync(600);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') scheduleSync(400);
+  });
+  window.addEventListener('online', () => scheduleSync(400));
   renderSummary();
   renderRating();
   renderHistory();

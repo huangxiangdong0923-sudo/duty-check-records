@@ -41,3 +41,10 @@ test('the entry pages and icons are pre-cached', () => {
 test('cached assets are fetched fresh during install', () => {
   assert.match(sw, /new Request\(asset, \{ cache: 'reload' \}\)/);
 });
+
+test('cross-origin requests (the sync API) never go through the cache', () => {
+  const fetchBlock = sw.slice(sw.indexOf("addEventListener('fetch'"));
+  const guard = fetchBlock.indexOf('self.location.origin');
+  assert.ok(guard > -1, 'the service worker must skip cross-origin requests');
+  assert.ok(guard < fetchBlock.indexOf('caches.match'), 'the origin check must run before any cache lookup');
+});

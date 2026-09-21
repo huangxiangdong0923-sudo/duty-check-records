@@ -1,5 +1,5 @@
 // 每次改动前端文件都要把 CACHE 版本号加一，否则手机上的离线缓存不会更新。
-const CACHE = 'duty-check-v4';
+const CACHE = 'duty-check-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS = [
   './campus/south/index.html',
   './campus/south/manifest.webmanifest',
   './js/version.js',
+  './js/sync.js',
   './js/reasons.js',
   './js/campuses.js',
   './js/modules.js',
@@ -50,6 +51,9 @@ function putInCache(request, response) {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
+  // 只处理本站文件。云同步用的 api.github.com 不能被缓存，否则会把旧的 sha 发给 GitHub，
+  // 每次上传都被判定为冲突。
+  if (new URL(request.url).origin !== self.location.origin) return;
 
   // 页面本身走网络优先，保证拿到最新版本；断网时回退到缓存。
   if (request.mode === 'navigate') {
