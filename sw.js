@@ -1,5 +1,5 @@
 // 每次改动前端文件都要把 CACHE 版本号加一，否则手机上的离线缓存不会更新。
-const CACHE = 'duty-check-v7';
+const CACHE = 'duty-check-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS = [
   './campus/south/index.html',
   './campus/south/manifest.webmanifest',
   './js/version.js',
+  './js/sync.js',
   './js/reasons.js',
   './js/campuses.js',
   './js/modules.js',

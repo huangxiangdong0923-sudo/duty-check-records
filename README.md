@@ -9,13 +9,40 @@
 | 东校区 | <https://huangxiangdong0923-sudo.github.io/duty-check-records/> | 一至四年级 | 金轮操场（一、四）、玉兔操场（二、三） |
 | 南校区 | <https://huangxiangdong0923-sudo.github.io/duty-check-records/campus/south/> | 五、六年级 | 操场（五、六） |
 
-两个校区是同一套代码、两份配置。页面按校区过滤记录：东校区只显示一至四年级，南校区只显示五、六年级，两边不会互相干扰。
+两个校区是同一套代码、两份配置。页面按校区过滤记录：东校区只显示一至四年级，南校区只显示五、六年级。共用一块存储和一份云端数据，所以两边不会互相干扰，南校区老师把令牌也粘贴一次就能用同一份云端备份。
 
 手机上打开链接后，用 Safari 的「分享 → 添加到主屏幕」或 Chrome 的「添加到主屏幕」，就能像 App 一样打开。
 
-主屏幕上的「App」和浏览器里的网页是两块独立的本地存储，电脑和手机也是各存各的，所以数据只存在当前这个入口里。换设备或换入口时，用「历史与备份」里的 JSON 导出/导入来搬（合并导入只补新增的记录，不会覆盖已有数据）。
+各设备的数据靠「云同步」打通（见下一节）。没开云同步时数据只存在当前这台设备上，换设备不会自动同步，可以用「历史与备份」里的 JSON 导出/导入来搬。
 
-建议的习惯：每周导出一次备份，文件名自带日期，放到手机「文件」App 或电脑的固定文件夹。
+## 云同步（打开后手机和电脑共用同一份数据）
+
+主屏幕上的 App 和浏览器里的网页是两块独立的本地存储，不开云同步的话两边数据不互通。云同步把记录存进一个私有 GitHub 仓库的 `records.json`：
+
+| 项目 | 值 |
+| --- | --- |
+| 数据仓库 | <https://github.com/huangxiangdong0923-sudo/duty-check-data>（私有） |
+| 同步文件 | `records.json` |
+| 令牌 | GitHub fine-grained token，只授权这一个仓库的 Contents 读写 |
+
+设置步骤：
+
+1. 打开 <https://github.com/settings/personal-access-tokens/new>
+2. Token name 填「值日检查同步」，Expiration 选 1 年
+3. Repository access 选 **Only select repositories**，只勾 `duty-check-data`
+4. Permissions → Repository permissions → **Contents** 设为 **Read and write**
+5. Generate token，复制 `github_pat_` 开头的那串
+6. 在 App 里进「历史与备份 → 云同步」，粘贴令牌，点「保存令牌并立即同步」
+
+每个设备、每个入口（网页 / 主屏幕 App）只需粘一次，令牌存在本机浏览器里。
+
+同步规则：
+
+- 打开页面、切换回页面、保存或删除记录后都会自动同步
+- 同一个 id 的记录以 `updatedAt` 较新的为准；删除用墓碑 id 记录，会同步到其它设备
+- 上传前先拉取，抢写冲突会自动重试一次
+- 顶部状态条显示「已同步 时间」，同步失败会显示原因，本机数据不受影响
+- 令牌是 `api.github.com` 的 Bearer token，网页直接把记录读写到你自己的私有仓库，不经过第三方服务器
 
 ## 校区配置
 
@@ -111,9 +138,10 @@ npm run serve                # 本地预览 http://localhost:5173
 | `js/reasons.js` | 日常值日的扣分项 |
 | `js/records.js` | 记录校验与规范化 |
 | `js/storage.js` | 本机存储与备份 |
+| `js/sync.js` | 云同步（GitHub 私有仓库、合并规则、冲突重试） |
 | `js/summary.js` | 汇总 |
 | `js/image-export.js` | 图片排版与绘制 |
-| `sw.js` / `manifest.webmanifest` | 离线缓存与主屏幕图标（只缓存本站文件，跨域请求一律放行） |
+| `sw.js` / `manifest.webmanifest` | 离线缓存与主屏幕图标（只缓存本站文件，不碰 `api.github.com`） |
 
 ## 部署
 
