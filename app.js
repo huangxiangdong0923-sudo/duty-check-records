@@ -6,6 +6,7 @@ import { renderSummaryBlob, renderRatingBlob, downloadBlob } from './js/image-ex
 import { todayIso, lastMondayIso, formatChipDateWithWeekday } from './js/dates.js';
 import { DEFAULT_CAMPUS, detectCampusId, filterByCampus, getCampus } from './js/campuses.js';
 import { rateWeek } from './js/rating.js';
+import { APP_VERSION, APP_UPDATED_AT } from './js/version.js';
 
 const GRADE_LABELS = ['', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级'];
 const CAMPUS = getCampus(detectCampusId());
@@ -411,6 +412,20 @@ function exportBackup() {
   setMessage('history-message', '备份文件已生成。', true);
 }
 
+async function checkForUpdate() {
+  setMessage('history-message', '正在检查更新…');
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration) {
+      await registration.update();
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
+  } catch (error) {
+    console.warn('Update check failed', error);
+  }
+  location.reload();
+}
+
 async function importBackupFile(file) {
   const text = await file.text();
   const mode = $('import-mode').value;
@@ -444,6 +459,7 @@ function resetEntryForm() {
 function initEntry() {
   document.title = APP_NAME;
   $('app-title').textContent = APP_NAME;
+  $('app-version').textContent = `当前版本 v${APP_VERSION}（${APP_UPDATED_AT} 更新）。如果看到的界面和电脑不一样，点下面的按钮。`;
   fillGradeOptions();
   fillClassOptions();
   fillSlotOptions();
@@ -484,6 +500,7 @@ function initEntry() {
   $('export-image').addEventListener('click', exportSummaryImage);
   $('export-rating').addEventListener('click', exportRatingImage);
   $('export-backup').addEventListener('click', exportBackup);
+  $('check-update').addEventListener('click', checkForUpdate);
   $('import-file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -521,6 +538,14 @@ initEntry();
 export { state, switchTab, switchModule, renderSummary, renderRating, renderHistory, renderTodayList };
 
 if ('serviceWorker' in navigator) {
+  // 已经装过 App 的设备：检测到新版本时自动重新加载一次，避免手机上一直看到旧界面。
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
   window.addEventListener('load', () => {
     const serviceWorkerUrl = new URL('./sw.js', import.meta.url);
     navigator.serviceWorker.register(serviceWorkerUrl).catch((error) => {
