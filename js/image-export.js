@@ -10,6 +10,23 @@ function locationText(record) {
   return `第${record.row}排第${record.seat}个`;
 }
 
+export function wrapText(text, maxChars) {
+  if (!Number.isFinite(maxChars) || maxChars < 4 || text.length <= maxChars) return [text];
+  const lines = [];
+  let current = '';
+  for (const [index, piece] of text.split('、').entries()) {
+    const chunk = index === 0 ? piece : `、${piece}`;
+    if (current && current.length + chunk.length > maxChars) {
+      lines.push(`${current}、`);
+      current = chunk.replace(/^、/, '');
+    } else {
+      current += chunk;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 export function buildImagePlan(records, date, options = {}) {
   const groups = summarize(records, date, 'daily');
   if (!groups.length) return null;
@@ -83,17 +100,21 @@ export function buildFlagImagePlan(records, date, options = {}) {
         align: 'left',
       });
       for (const item of classGroup.items) {
-        push({
-          type: 'entry',
-          text: formatFlagItemText(item),
-          x: padding + 56,
-          y,
-          height: 42,
-          size: 24,
-          weight: 400,
-          color: '#1F2937',
-          align: 'left',
-        });
+        const indent = padding + 56;
+        const maxChars = Math.max(12, Math.floor((width - indent - padding) / 24));
+        for (const [index, line] of wrapText(formatFlagItemText(item), maxChars).entries()) {
+          push({
+            type: 'entry',
+            text: line,
+            x: index === 0 ? indent : indent + 24,
+            y,
+            height: 42,
+            size: 24,
+            weight: 400,
+            color: '#1F2937',
+            align: 'left',
+          });
+        }
       }
     }
     y += 16;

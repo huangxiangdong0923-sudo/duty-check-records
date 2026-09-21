@@ -1,6 +1,6 @@
 {
-  "name": "值日扣分记录",
-  "short_name": "值日扣分",
+  "name": "值日检查记录",
+  "short_name": "值日检查",
   "lang": "zh-CN",
   "start_url": "./",
   "scope": "./",

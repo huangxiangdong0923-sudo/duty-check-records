@@ -1,16 +1,43 @@
-import { SLOTS, getReasonsForSlot } from './js/reasons.js';
-import { classCountForGrade, createRecord } from './js/records.js';
+import { getModule, getSlotsForModule, getReasonsForModule, groundForGrade } from './js/modules.js';
+import { classCountForGrade, createRecord, defaultPointsFor, parseStudentNos } from './js/records.js';
 import { loadRecords, saveRecords, createBackup, importBackup } from './js/storage.js';
-import { summarize, getTotals } from './js/summary.js';
+import { summarize, getTotals, summarizeFlag, flagItemLocationText } from './js/summary.js';
 import { renderSummaryBlob, downloadBlob } from './js/image-export.js';
+import { todayIso, lastMondayIso } from './js/dates.js';
 
-const state = { records: loadRecords(), selectedReasonCode: null };
+const GRADE_LABELS = ['', '一年级', '二年级', '三年级', '四年级'];
+
+const state = {
+  records: loadRecords(),
+  moduleId: 'daily',
+  selectedReasonCode: null,
+  pointsDirty: false,
+  entryDateTouched: false,
+  summaryDateTouched: false,
+};
 
 const $ = (id) => document.getElementById(id);
 
-function todayIso() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+function setMessage(id, text, ok = false) {
+  const element = $(id);
+  element.textContent = text;
+  element.classList.toggle('is-ok', Boolean(ok && text));
+}
+
+function currentModule() {
+  return getModule(state.moduleId);
+}
+
+function moduleOf(record) {
+  return record?.module === 'flag' ? 'flag' : 'daily';
+}
+
+function defaultDateFor(moduleId) {
+  return moduleId === 'flag' ? lastMondayIso() : todayIso();
+}
+
+function classLabel(grade, classNo) {
+  return `${GRADE_LABELS[grade] || `${grade}年级`}${classNo}班`;
 }
 
 function fillGradeOptions() {
@@ -19,7 +46,7 @@ function fillGradeOptions() {
   for (const grade of [1, 2, 3, 4]) {
     const option = document.createElement('option');
     option.value = String(grade);
-    option.textContent = ['', '一年级', '二年级', '三年级', '四年级'][grade];
+    option.textContent = GRADE_LABELS[grade];
     select.appendChild(option);
   }
 }
@@ -34,12 +61,13 @@ function fillClassOptions() {
     option.textContent = `${classNo}班`;
     select.appendChild(option);
   }
+  updateGroundChip();
 }
 
 function fillSlotOptions() {
   const select = $('f-slot');
   select.innerHTML = '';
-  for (const slot of SLOTS) {
+  for (const slot of getSlotsForModule(state.moduleId)) {
     const option = document.createElement('option');
     option.value = slot.code;
     option.textContent = slot.label;
@@ -47,10 +75,38 @@ function fillSlotOptions() {
   }
 }
 
+function updateGroundChip() {
+  const chip = $('ground-chip');
+  if (state.moduleId !== 'flag') {
+    chip.hidden = true;
+    chip.textContent = '';
+    return;
+  }
+  const ground = groundForGrade($('f-grade').value);
+  chip.hidden = false;
+  chip.textContent = ground ? `检查地点：${ground.label}（${ground.gradesLabel}）` : '检查地点：未确定';
+}
+
+function updateLocationFields() {
+  const isSeat = document.querySelector('input[name="locationType"]:checked')?.value === 'seat';
+  $('seat-fields').hidden = !isSeat;
+  $('student-fields').hidden = isSeat;
+}
+
+function updateModuleVisibility() {
+  const isFlag = state.moduleId === 'flag';
+  $('daily-only').hidden = isFlag;
+  $('flag-fields').hidden = !isFlag;
+  document.querySelectorAll('.module').forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.module === state.moduleId);
+  });
+  $('summary-title').textContent = `${currentModule().label}汇总`;
+}
+
 function renderReasons() {
   const grid = $('reason-grid');
   grid.innerHTML = '';
-  for (const reason of getReasonsForSlot($('f-slot').value || 'morning')) {
+  for (const reason of getReasonsForModule(state.moduleId, $('f-slot').value)) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'reason';
@@ -69,15 +125,16 @@ function renderReasons() {
   }
 }
 
-function updateLocationFields() {
-  const isStudent = document.querySelector('input[name="locationType"]:checked').value === 'student';
-  $('seat-fields').hidden = isStudent;
-  $('student-fields').hidden = !isStudent;
+function syncAutoPoints() {
+  if (state.pointsDirty) return;
+  $('f-points').value = String(defaultPointsFor($('f-student-nos').value));
 }
 
 function formDraft() {
-  const locationType = document.querySelector('input[name="locationType"]:checked').value;
+  const isFlag = state.moduleId === 'flag';
+  const locationType = isFlag ? 'studentNo' : document.querySelector('input[name="locationType"]:checked').value;
   return {
+    module: state.moduleId,
     date: $('f-date').value,
     grade: Number($('f-grade').value),
     classNo: Number($('f-class').value),
@@ -85,6 +142,7 @@ function formDraft() {
     row: locationType === 'seat' ? Number($('f-row').value) : null,
     seat: locationType === 'seat' ? Number($('f-seat').value) : null,
     studentName: locationType === 'student' ? $('f-student').value : '',
+    studentNos: isFlag ? $('f-student-nos').value : [],
     slot: $('f-slot').value,
     reasonCode: state.selectedReasonCode || '',
     points: Number($('f-points').value || 1),
@@ -92,20 +150,31 @@ function formDraft() {
   };
 }
 
+function locationText(record) {
+  if (record.locationType === 'student') return record.studentName || '学生';
+  if (record.locationType === 'studentNo') {
+    const nos = parseStudentNos(record.studentNos);
+    return nos.length ? `${nos.join('、')} 号` : '整班';
+  }
+  return `第${record.row}排第${record.seat}个`;
+}
+
 function renderTodayList() {
   const date = $('f-date').value || todayIso();
-  const records = state.records.filter((record) => record.date === date).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const records = state.records
+    .filter((record) => record.date === date && moduleOf(record) === state.moduleId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const list = $('today-list');
   list.innerHTML = '';
   if (!records.length) {
-    list.textContent = '今天还没有扣分记录。';
+    list.textContent = '这一天还没有扣分记录。';
     return;
   }
   for (const record of records) {
     const item = document.createElement('div');
     item.className = 'record-item';
-    const location = record.locationType === 'student' ? record.studentName : `第${record.row}排第${record.seat}个`;
-    item.innerHTML = `<strong>${record.grade}年级${record.classNo}班</strong> ${location} · ${record.reasonLabel} · <span class="points">-${record.points}分</span>`;
+    const content = document.createElement('span');
+    content.innerHTML = `<strong>${classLabel(record.grade, record.classNo)}</strong> ${locationText(record)} · ${record.reasonLabel} · <span class="points">-${record.points}分</span>`;
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = '删除';
@@ -114,8 +183,10 @@ function renderTodayList() {
       state.records = state.records.filter((candidate) => candidate.id !== record.id);
       saveRecords(state.records);
       renderTodayList();
+      renderSummary();
+      renderHistory();
     });
-    item.appendChild(remove);
+    item.append(content, remove);
     list.appendChild(item);
   }
 }
@@ -123,29 +194,90 @@ function renderTodayList() {
 function switchTab(tabName) {
   document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === tabName));
   document.querySelectorAll('.panel').forEach((panel) => panel.classList.toggle('is-active', panel.id === `panel-${tabName}`));
-  if (tabName === 'summary') window.dispatchEvent(new CustomEvent('app:summary'));
-  if (tabName === 'history') window.dispatchEvent(new CustomEvent('app:history'));
+  if (tabName === 'summary') renderSummary();
+  if (tabName === 'history') renderHistory();
+}
+
+function switchModule(moduleId) {
+  state.moduleId = getModule(moduleId).id;
+  state.selectedReasonCode = null;
+  state.pointsDirty = false;
+  $('f-student-nos').value = '';
+  $('f-points').value = '1';
+  fillSlotOptions();
+  updateModuleVisibility();
+  updateGroundChip();
+  renderReasons();
+  if (!state.entryDateTouched) $('f-date').value = defaultDateFor(state.moduleId);
+  if (!state.summaryDateTouched) $('summary-date').value = defaultDateFor(state.moduleId);
+  renderTodayList();
+  renderSummary();
+  renderHistory();
+}
+
+function renderFlagClassCard(classGroup) {
+  const card = document.createElement('section');
+  card.className = 'summary-class';
+  const heading = document.createElement('h4');
+  heading.textContent = `${classGroup.label}（${classGroup.totalPoints}分）`;
+  card.appendChild(heading);
+  for (const item of classGroup.items) {
+    const line = document.createElement('div');
+    line.className = 'summary-entry';
+    const text = document.createElement('span');
+    text.textContent = `${item.reasonLabel}：${flagItemLocationText(item)}`;
+    const points = document.createElement('span');
+    points.className = 'points';
+    points.textContent = `-${item.points}分`;
+    line.append(text, points);
+    card.appendChild(line);
+  }
+  return card;
 }
 
 function renderSummary() {
   const date = $('summary-date').value || todayIso();
-  const groups = summarize(state.records, date);
+  const container = $('summary-groups');
+  container.innerHTML = '';
+  setMessage('summary-message', '');
+
+  if (state.moduleId === 'flag') {
+    const { grounds, totals } = summarizeFlag(state.records, date);
+    $('summary-total').textContent = totals.entryCount
+      ? `当天合计：${totals.totalPoints}分 · ${totals.classCount}个班级 · ${totals.entryCount}条记录`
+      : '当天没有扣分记录';
+    for (const ground of grounds) {
+      const section = document.createElement('section');
+      section.className = 'summary-ground';
+      const heading = document.createElement('h3');
+      heading.textContent = ground.gradesLabel ? `${ground.label}（${ground.gradesLabel}）` : ground.label;
+      section.appendChild(heading);
+      for (const classGroup of ground.classes) section.appendChild(renderFlagClassCard(classGroup));
+      container.appendChild(section);
+    }
+    return;
+  }
+
+  const groups = summarize(state.records, date, 'daily');
   const totals = getTotals(groups);
   $('summary-total').textContent = groups.length
     ? `当天合计：${totals.totalPoints}分 · ${totals.classCount}个班级 · ${totals.entryCount}条记录`
     : '当天没有扣分记录';
-  $('summary-message').textContent = '';
-  const container = $('summary-groups');
-  container.innerHTML = '';
   for (const group of groups) {
     const card = document.createElement('section');
     card.className = 'summary-class';
-    card.innerHTML = `<h3>${group.label}（${group.totalPoints}分）</h3>`;
+    const heading = document.createElement('h3');
+    heading.textContent = `${group.label}（${group.totalPoints}分）`;
+    card.appendChild(heading);
     for (const entry of group.entries) {
       const line = document.createElement('div');
       line.className = 'summary-entry';
-      const location = entry.locationType === 'student' ? entry.studentName : `第${entry.row}排第${entry.seat}个`;
-      line.innerHTML = `<span>${location} · ${entry.reasonLabel}</span><span class="points">-${entry.points}分</span>`;
+      const text = document.createElement('span');
+      text.textContent = `${locationText(entry)} · ${entry.reasonLabel}`;
+      const points = document.createElement('span');
+      points.className = 'points';
+      points.textContent = `-${entry.points}分`;
+      line.append(text, points);
       card.appendChild(line);
     }
     container.appendChild(card);
@@ -154,18 +286,24 @@ function renderSummary() {
 
 async function exportSummaryImage() {
   const date = $('summary-date').value || todayIso();
-  const groups = summarize(state.records, date);
-  if (!groups.length) {
-    $('summary-message').textContent = '当天没有扣分记录，暂不能导出图片。';
+  const hasRecords = state.records.some((record) => record.date === date && moduleOf(record) === state.moduleId);
+  if (!hasRecords) {
+    setMessage('summary-message', '当天没有扣分记录，暂不能导出图片。');
     return;
   }
-  const blob = await renderSummaryBlob(state.records, date);
-  downloadBlob(blob, `${date}-值日检查扣分情况.png`);
-  $('summary-message').textContent = '图片已生成并开始下载。';
+  const blob = await renderSummaryBlob(state.records, date, state.moduleId);
+  if (!blob) {
+    setMessage('summary-message', '图片生成失败，请重试。');
+    return;
+  }
+  downloadBlob(blob, `${date}-${currentModule().imageSuffix}.png`);
+  setMessage('summary-message', '图片已生成并开始下载。', true);
 }
 
 function renderHistory() {
-  const dates = Array.from(new Set(state.records.map((record) => record.date))).sort().reverse();
+  const dates = Array.from(new Set(
+    state.records.filter((record) => moduleOf(record) === state.moduleId).map((record) => record.date),
+  )).sort().reverse();
   const container = $('history-list');
   container.innerHTML = '';
   if (!dates.length) {
@@ -173,7 +311,7 @@ function renderHistory() {
     return;
   }
   for (const date of dates) {
-    const count = state.records.filter((record) => record.date === date).length;
+    const count = state.records.filter((record) => record.date === date && moduleOf(record) === state.moduleId).length;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'record-item';
@@ -189,8 +327,8 @@ function renderHistory() {
 
 function exportBackup() {
   const blob = new Blob([JSON.stringify(createBackup(state.records), null, 2)], { type: 'application/json' });
-  downloadBlob(blob, `值日扣分备份-${todayIso()}.json`);
-  $('history-message').textContent = '备份文件已生成。';
+  downloadBlob(blob, `值日检查备份-${todayIso()}.json`);
+  setMessage('history-message', '备份文件已生成。', true);
 }
 
 async function importBackupFile(file) {
@@ -198,42 +336,67 @@ async function importBackupFile(file) {
   const mode = $('import-mode').value;
   if (mode === 'replace') {
     if (!confirm('覆盖会删除本机现有记录，确定继续吗？')) return;
-    const parsed = JSON.parse(text);
-    if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.records)) throw new Error('备份文件格式不正确');
-    state.records = parsed.records;
+    const result = importBackup(text, []);
+    state.records = result.records;
     saveRecords(state.records);
-    $('history-message').textContent = `已覆盖导入 ${state.records.length} 条记录。`;
+    setMessage('history-message', `已覆盖导入 ${state.records.length} 条记录。`, true);
   } else {
     const result = importBackup(text, state.records);
     state.records = result.records;
     saveRecords(state.records);
-    $('history-message').textContent = `合并完成：新增 ${result.added} 条，跳过 ${result.skipped} 条重复记录。`;
+    setMessage('history-message', `合并完成：新增 ${result.added} 条，跳过 ${result.skipped} 条重复记录。`, true);
   }
   renderHistory();
   renderTodayList();
   renderSummary();
 }
 
+function resetEntryForm() {
+  state.selectedReasonCode = null;
+  state.pointsDirty = false;
+  $('f-note').value = '';
+  $('f-points').value = '1';
+  $('f-student-nos').value = '';
+  renderReasons();
+}
+
 function initEntry() {
   fillGradeOptions();
   fillClassOptions();
   fillSlotOptions();
-  $('f-date').value = todayIso();
-  $('summary-date').value = todayIso();
+  $('f-date').value = defaultDateFor(state.moduleId);
+  $('summary-date').value = defaultDateFor(state.moduleId);
   updateLocationFields();
+  updateModuleVisibility();
+  updateGroundChip();
   renderReasons();
   renderTodayList();
 
-  $('f-grade').addEventListener('change', fillClassOptions);
+  document.querySelectorAll('.module').forEach((button) => {
+    button.addEventListener('click', () => switchModule(button.dataset.module));
+  });
+  $('f-grade').addEventListener('change', () => {
+    fillClassOptions();
+    updateGroundChip();
+  });
   $('f-slot').addEventListener('change', () => {
     state.selectedReasonCode = null;
     renderReasons();
   });
+  $('f-student-nos').addEventListener('input', syncAutoPoints);
+  $('f-points').addEventListener('input', () => {
+    state.pointsDirty = true;
+  });
   document.querySelectorAll('input[name="locationType"]').forEach((input) => input.addEventListener('change', updateLocationFields));
-  $('f-date').addEventListener('change', renderTodayList);
-  $('summary-date').addEventListener('change', renderSummary);
+  $('f-date').addEventListener('change', () => {
+    state.entryDateTouched = true;
+    renderTodayList();
+  });
+  $('summary-date').addEventListener('change', () => {
+    state.summaryDateTouched = true;
+    renderSummary();
+  });
   $('export-image').addEventListener('click', exportSummaryImage);
-  window.addEventListener('app:summary', renderSummary);
   $('export-backup').addEventListener('click', exportBackup);
   $('import-file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
@@ -241,27 +404,24 @@ function initEntry() {
     try {
       await importBackupFile(file);
     } catch (error) {
-      $('history-message').textContent = error.message;
+      setMessage('history-message', error.message);
     } finally {
       event.target.value = '';
     }
   });
-  window.addEventListener('app:history', renderHistory);
   $('entry-form').addEventListener('submit', (event) => {
     event.preventDefault();
-    const message = $('entry-message');
     try {
       const record = createRecord(formDraft());
       state.records = [record, ...state.records];
       saveRecords(state.records);
-      message.textContent = `已保存：${record.grade}年级${record.classNo}班 · ${record.reasonLabel}`;
-      state.selectedReasonCode = null;
-      $('f-note').value = '';
-      $('f-points').value = '1';
-      renderReasons();
+      setMessage('entry-message', `已保存：${classLabel(record.grade, record.classNo)} · ${record.reasonLabel} · ${locationText(record)}`, true);
+      resetEntryForm();
       renderTodayList();
+      renderSummary();
+      renderHistory();
     } catch (error) {
-      message.textContent = error.message;
+      setMessage('entry-message', error.message);
     }
   });
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
@@ -270,7 +430,7 @@ function initEntry() {
 }
 
 initEntry();
-export { state, switchTab, renderSummary, renderHistory };
+export { state, switchTab, switchModule, renderSummary, renderHistory, renderTodayList };
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

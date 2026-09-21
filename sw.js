@@ -1,4 +1,4 @@
-const CACHE = 'duty-deduction-v1';
+const CACHE = 'duty-deduction-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -6,6 +6,8 @@ const ASSETS = [
   './app.js',
   './manifest.webmanifest',
   './js/reasons.js',
+  './js/modules.js',
+  './js/dates.js',
   './js/records.js',
   './js/storage.js',
   './js/summary.js',

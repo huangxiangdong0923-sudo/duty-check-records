@@ -4,13 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1E5AA8">
-  <title>值日扣分记录</title>
+  <title>值日检查记录</title>
+  <link rel="icon" href="./icons/icon-192.png">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header class="app-header">
-    <h1>值日扣分记录</h1>
+    <h1>值日检查记录</h1>
+    <nav id="module-switch" class="module-switch" aria-label="检查类型">
+      <button type="button" class="module is-active" data-module="daily">日常值日检查</button>
+      <button type="button" class="module" data-module="flag">周一升旗检查</button>
+    </nav>
     <nav class="tabs" aria-label="页面切换">
       <button type="button" class="tab is-active" data-tab="entry">录入</button>
       <button type="button" class="tab" data-tab="summary">汇总</button>
@@ -31,30 +36,41 @@
           <select id="f-class" name="classNo" required></select>
         </label>
 
-        <fieldset>
-          <legend>填写位置方式</legend>
-          <label><input type="radio" name="locationType" value="seat" checked> 第几排第几个</label>
-          <label><input type="radio" name="locationType" value="student"> 学生姓名</label>
-        </fieldset>
+        <p id="ground-chip" class="ground-chip" hidden></p>
 
-        <div id="seat-fields">
-          <label>第几排（竖着数）
-            <input id="f-row" name="row" type="number" min="1" step="1">
+        <div id="flag-fields" hidden>
+          <label>学号（可填多个）
+            <input id="f-student-nos" name="studentNos" type="text" inputmode="numeric" autocomplete="off" placeholder="例如：3 7 12">
           </label>
-          <label>第几个（竖着数）
-            <input id="f-seat" name="seat" type="number" min="1" step="1">
-          </label>
+          <p class="hint">用空格、逗号或顿号分隔；留空表示整班问题。</p>
         </div>
 
-        <div id="student-fields" hidden>
-          <label>学生姓名
-            <input id="f-student" name="studentName" type="text" maxlength="20">
+        <div id="daily-only">
+          <fieldset>
+            <legend>填写位置方式</legend>
+            <label><input type="radio" name="locationType" value="seat" checked> 第几排第几个</label>
+            <label><input type="radio" name="locationType" value="student"> 学生姓名</label>
+          </fieldset>
+
+          <div id="seat-fields">
+            <label>第几排（竖着数）
+              <input id="f-row" name="row" type="number" min="1" step="1">
+            </label>
+            <label>第几个（竖着数）
+              <input id="f-seat" name="seat" type="number" min="1" step="1">
+            </label>
+          </div>
+
+          <div id="student-fields" hidden>
+            <label>学生姓名
+              <input id="f-student" name="studentName" type="text" maxlength="20">
+            </label>
+          </div>
+
+          <label>检查时间
+            <select id="f-slot" name="slot" required></select>
           </label>
         </div>
-
-        <label>检查时间
-          <select id="f-slot" name="slot" required></select>
-        </label>
 
         <div id="reason-grid" class="reason-grid" aria-label="扣分原因"></div>
 
@@ -67,11 +83,12 @@
         <p id="entry-message" class="message" role="status"></p>
         <button id="save-record" type="submit" class="primary">保存记录</button>
       </form>
-      <h2>今日记录</h2>
+      <h2>当天记录</h2>
       <div id="today-list" class="record-list"></div>
     </section>
 
     <section id="panel-summary" class="panel">
+      <h2 id="summary-title">日常值日检查汇总</h2>
       <label>汇总日期
         <input id="summary-date" type="date">
       </label>

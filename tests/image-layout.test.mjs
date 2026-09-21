@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildImagePlan } from '../js/image-export.js';
-import { buildFlagImagePlan } from '../js/image-export.js';
+import { buildFlagImagePlan, wrapText } from '../js/image-export.js';
 
 const records = [
   { id: 'r1', date: '2026-09-17', grade: 3, classNo: 1, points: 1,
@@ -76,4 +76,24 @@ test('flag image plan keeps every row inside the canvas width', () => {
     const half = (row.text.length * row.size) / (row.align === 'center' ? 2 : 1);
     assert.ok(row.x + half <= plan.width, `${row.text} overflows`);
   }
+});
+
+test('a full class of student numbers wraps instead of overflowing', () => {
+  const many = Array.from({ length: 20 }, (_, index) => index + 1);
+  const plan = buildFlagImagePlan([{
+    id: 'f9', module: 'flag', date: '2026-09-21', grade: 3, classNo: 5, points: 20,
+    locationType: 'studentNo', studentNos: many.map(String),
+    reasonCode: 'flag-scarf', reasonLabel: '未佩戴红领巾', createdAt: '2026-09-21T04:00:00.000Z',
+  }], '2026-09-21');
+  const rows = plan.rows.filter((row) => row.type === 'entry');
+  assert.ok(rows.length > 1, 'expected the line to wrap');
+  for (const row of plan.rows) {
+    const half = (row.text.length * row.size) / (row.align === 'center' ? 2 : 1);
+    assert.ok(row.x + half <= plan.width, `${row.text} overflows`);
+  }
+  assert.equal(rows.map((row) => row.text).join('').replace(/\s/g, ''), '未佩戴红领巾：1、2、3、4、5、6、7、8、9、10、11、12、13、14、15、16、17、18、19、20号（20分）');
+});
+
+test('wrapText keeps short text on one line', () => {
+  assert.deepEqual(wrapText('未穿黑鞋子：9 号（1分）', 37), ['未穿黑鞋子：9 号（1分）']);
 });

@@ -15,6 +15,9 @@
 body { margin: 0; background: var(--bg); color: var(--ink); }
 .app-header { background: #FFFFFF; padding: 16px 16px 0; border-bottom: 1px solid var(--line); }
 h1 { margin: 0 0 12px; font-size: 24px; }
+.module-switch { display: flex; gap: 8px; margin-bottom: 12px; }
+.module { flex: 1; padding: 12px 10px; border: 1px solid var(--line); border-radius: 12px; background: #FFFFFF; color: var(--muted); font-size: 16px; font-weight: 600; }
+.module.is-active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
 .tabs { display: flex; gap: 8px; }
 .tab { border: 0; background: var(--blue-soft); color: var(--blue); padding: 10px 14px; border-radius: 12px 12px 0 0; font-size: 16px; }
 .tab.is-active { background: var(--blue); color: #FFFFFF; }
@@ -30,11 +33,20 @@ fieldset input { width: auto; margin: 0; }
 .reason.is-selected { border: 2px solid var(--blue); background: var(--blue-soft); }
 .primary { width: 100%; padding: 14px; border: 0; border-radius: 12px; background: var(--blue); color: #FFFFFF; font-size: 17px; }
 .message { color: var(--red); min-height: 24px; }
+.message.is-ok { color: var(--green); font-weight: 600; }
+.ground-chip { margin: 4px 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--blue-soft); color: var(--blue); font-size: 15px; font-weight: 600; }
+.hint { margin: -4px 0 12px; color: var(--muted); font-size: 14px; }
 .record-list { display: grid; gap: 8px; }
 .record-item, .summary-class { background: #FFFFFF; border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
-.record-item button { margin-right: 8px; }
+.record-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; font-size: 16px; }
+.record-item button { margin-left: 8px; flex: none; }
 .summary-total { font-size: 20px; font-weight: 700; margin: 12px 0; }
+#export-image { margin-bottom: 16px; }
 .summary-class h3 { margin: 0 0 8px; color: var(--blue); }
+.summary-class h4 { margin: 0 0 8px; color: var(--blue); font-size: 17px; }
+.summary-groups { display: grid; gap: 16px; }
+.summary-ground h3 { margin: 0 0 10px; color: var(--orange); font-size: 19px; }
+.summary-ground { display: grid; gap: 10px; }
 .summary-entry { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
 .points { color: var(--red); font-weight: 700; }
 @media (min-width: 640px) {
