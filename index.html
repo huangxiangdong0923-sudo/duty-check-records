@@ -19,6 +19,7 @@
     <nav class="tabs" aria-label="页面切换">
       <button type="button" class="tab is-active" data-tab="entry">录入</button>
       <button type="button" class="tab" data-tab="summary">汇总</button>
+      <button type="button" class="tab" data-tab="rating">星级评比</button>
       <button type="button" class="tab" data-tab="history">历史与备份</button>
     </nav>
   </header>
@@ -96,6 +97,18 @@
       <p id="summary-message" class="message" role="status"></p>
       <button id="export-image" type="button" class="primary">导出当天图片</button>
       <div id="summary-groups" class="summary-groups"></div>
+    </section>
+
+    <section id="panel-rating" class="panel">
+      <h2 id="rating-title">本周星级班级评比</h2>
+      <label>选择这一周（点任意一天）
+        <input id="rating-week" type="date">
+      </label>
+      <p id="rating-range" class="hint"></p>
+      <div id="rating-total" class="summary-total"></div>
+      <p id="rating-message" class="message" role="status"></p>
+      <button id="export-rating" type="button" class="primary">导出本周评比图片</button>
+      <div id="rating-groups" class="summary-groups"></div>
     </section>
 
     <section id="panel-history" class="panel">

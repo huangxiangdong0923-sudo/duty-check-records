@@ -2,9 +2,10 @@ import { getModule, getSlotsForModule, getReasonsForModule, groundForGrade } fro
 import { classCountForGrade, createRecord, defaultPointsFor, parseStudentNos } from './js/records.js';
 import { loadRecords, saveRecords, createBackup, importBackup } from './js/storage.js';
 import { summarize, getTotals, summarizeFlag, flagItemLocationText } from './js/summary.js';
-import { renderSummaryBlob, downloadBlob } from './js/image-export.js';
-import { todayIso, lastMondayIso } from './js/dates.js';
+import { renderSummaryBlob, renderRatingBlob, downloadBlob } from './js/image-export.js';
+import { todayIso, lastMondayIso, formatChipDateWithWeekday } from './js/dates.js';
 import { DEFAULT_CAMPUS, detectCampusId, filterByCampus, getCampus } from './js/campuses.js';
+import { rateWeek } from './js/rating.js';
 
 const GRADE_LABELS = ['', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级'];
 const CAMPUS = getCampus(detectCampusId());
@@ -192,6 +193,7 @@ function renderTodayList() {
       saveRecords(state.records);
       renderTodayList();
       renderSummary();
+      renderRating();
       renderHistory();
     });
     item.append(content, remove);
@@ -203,6 +205,7 @@ function switchTab(tabName) {
   document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === tabName));
   document.querySelectorAll('.panel').forEach((panel) => panel.classList.toggle('is-active', panel.id === `panel-${tabName}`));
   if (tabName === 'summary') renderSummary();
+  if (tabName === 'rating') renderRating();
   if (tabName === 'history') renderHistory();
 }
 
@@ -220,6 +223,7 @@ function switchModule(moduleId) {
   if (!state.summaryDateTouched) $('summary-date').value = defaultDateFor(state.moduleId);
   renderTodayList();
   renderSummary();
+  renderRating();
   renderHistory();
 }
 
@@ -308,6 +312,74 @@ async function exportSummaryImage() {
   setMessage('summary-message', '图片已生成并开始下载。', true);
 }
 
+function ratingMonday() {
+  return lastMondayIso($('rating-week').value || todayIso());
+}
+
+function renderRating() {
+  const rating = rateWeek(campusRecords(), CAMPUS, ratingMonday());
+  $('rating-title').textContent = `${CAMPUS.label}本周星级班级评比`;
+  $('rating-range').textContent = `统计范围：${formatChipDateWithWeekday(rating.range.start)} 至 ${formatChipDateWithWeekday(rating.range.end)}（周一至周五）`;
+  $('rating-total').textContent = `本周共 ${rating.totals.classCount} 个班级 · 合计扣 ${rating.totals.deduction} 分 · ${rating.totals.recordCount} 条检查记录`;
+  setMessage('rating-message', '');
+
+  const container = $('rating-groups');
+  container.innerHTML = '';
+  for (const level of rating.levels) {
+    const section = document.createElement('section');
+    section.className = `summary-ground rating-level-${level.stars}`;
+    const heading = document.createElement('h3');
+    heading.textContent = `${level.label}　${level.classes.length} 个`;
+    const rule = document.createElement('p');
+    rule.className = 'rating-rule';
+    rule.textContent = `${level.rule} · ${level.scoreText}`;
+    const chips = document.createElement('div');
+    chips.className = 'rating-chips';
+    if (!level.classes.length) {
+      const empty = document.createElement('span');
+      empty.className = 'rating-rule';
+      empty.textContent = '无';
+      chips.appendChild(empty);
+    }
+    for (const entry of level.classes) {
+      const chip = document.createElement('span');
+      chip.className = 'rating-chip';
+      chip.append(document.createTextNode(entry.label));
+      if (level.stars !== 5) {
+        const deduction = document.createElement('span');
+        deduction.className = 'deduction';
+        deduction.textContent = `-${entry.deduction}`;
+        chip.appendChild(deduction);
+      }
+      chips.appendChild(chip);
+    }
+    section.append(heading, rule, chips);
+    container.appendChild(section);
+  }
+  if (rating.totals.uncheckedCount) {
+    const note = document.createElement('p');
+    note.className = 'rating-rule';
+    note.textContent = `说明：其中 ${rating.totals.uncheckedCount} 个班级本周还没有检查记录，按未被扣分计为五星。`;
+    container.appendChild(note);
+  }
+}
+
+async function exportRatingImage() {
+  const mondayIso = ratingMonday();
+  const rating = rateWeek(campusRecords(), CAMPUS, mondayIso);
+  if (!rating.totals.recordCount) {
+    setMessage('rating-message', '这一周还没有检查记录，暂不能导出图片。');
+    return;
+  }
+  const blob = await renderRatingBlob(campusRecords(), CAMPUS, mondayIso);
+  if (!blob) {
+    setMessage('rating-message', '图片生成失败，请重试。');
+    return;
+  }
+  downloadBlob(blob, `${rating.range.start}-${rating.range.end}-星级班级评比.png`);
+  setMessage('rating-message', '图片已生成并开始下载。', true);
+}
+
 function renderHistory() {
   const dates = Array.from(new Set(
     campusRecords().filter((record) => moduleOf(record) === state.moduleId).map((record) => record.date),
@@ -357,6 +429,7 @@ async function importBackupFile(file) {
   renderHistory();
   renderTodayList();
   renderSummary();
+  renderRating();
 }
 
 function resetEntryForm() {
@@ -376,6 +449,7 @@ function initEntry() {
   fillSlotOptions();
   $('f-date').value = defaultDateFor(state.moduleId);
   $('summary-date').value = defaultDateFor(state.moduleId);
+  $('rating-week').value = lastMondayIso();
   updateLocationFields();
   updateModuleVisibility();
   updateGroundChip();
@@ -406,7 +480,9 @@ function initEntry() {
     state.summaryDateTouched = true;
     renderSummary();
   });
+  $('rating-week').addEventListener('change', renderRating);
   $('export-image').addEventListener('click', exportSummaryImage);
+  $('export-rating').addEventListener('click', exportRatingImage);
   $('export-backup').addEventListener('click', exportBackup);
   $('import-file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
@@ -429,6 +505,7 @@ function initEntry() {
       resetEntryForm();
       renderTodayList();
       renderSummary();
+      renderRating();
       renderHistory();
     } catch (error) {
       setMessage('entry-message', error.message);
@@ -436,11 +513,12 @@ function initEntry() {
   });
   document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
   renderSummary();
+  renderRating();
   renderHistory();
 }
 
 initEntry();
-export { state, switchTab, switchModule, renderSummary, renderHistory, renderTodayList };
+export { state, switchTab, switchModule, renderSummary, renderRating, renderHistory, renderTodayList };
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

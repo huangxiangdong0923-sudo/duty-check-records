@@ -15,6 +15,7 @@ const ASSETS = [
   './js/records.js',
   './js/storage.js',
   './js/summary.js',
+  './js/rating.js',
   './js/image-export.js',
   './icons/icon-192.png',
   './icons/icon-512.png'

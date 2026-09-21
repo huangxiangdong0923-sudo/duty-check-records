@@ -1,4 +1,5 @@
 import { summarize, getTotals, summarizeFlag, formatFlagItemText } from './summary.js';
+import { WEEKLY_FULL_SCORE, rateWeek } from './rating.js';
 
 function formatDateTitle(date, suffix = '值日检查扣分情况') {
   const [, month, day] = date.split('-').map(Number);
@@ -25,6 +26,103 @@ export function wrapText(text, maxChars) {
   }
   if (current) lines.push(current);
   return lines;
+}
+
+export function wrapTokens(tokens, maxChars, separator = '  ') {
+  const lines = [];
+  let current = '';
+  for (const token of tokens) {
+    const candidate = current ? `${current}${separator}${token}` : token;
+    if (current && candidate.length > maxChars) {
+      lines.push(current);
+      current = token;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+export function buildRatingImagePlan(records, campus, mondayIso, options = {}) {
+  const rating = rateWeek(records, campus, mondayIso);
+  const width = options.width || 1080;
+  const padding = options.padding || 64;
+  const rows = [];
+  let y = padding + 20;
+  const push = (row) => {
+    rows.push({ ...row, y });
+    y += row.height;
+  };
+  push({
+    type: 'title',
+    text: `${formatDateTitle(rating.range.start, '')}–${formatDateTitle(rating.range.end, '')}星级班级评比`,
+    x: width / 2,
+    y,
+    height: 70,
+    size: 44,
+    weight: 700,
+    color: '#1F2937',
+    align: 'center',
+  });
+  push({
+    type: 'subtitle',
+    text: `${campus.label} · 满分 ${WEEKLY_FULL_SCORE} 分`,
+    x: width / 2,
+    y,
+    height: 46,
+    size: 26,
+    weight: 400,
+    color: '#64748B',
+    align: 'center',
+  });
+  y += 16;
+
+  const indent = padding;
+  const maxChars = Math.max(12, Math.floor((width - indent - padding) / 24));
+  for (const level of rating.levels) {
+    push({
+      type: 'level',
+      text: `${level.label}　${level.classes.length} 个（${level.scoreText}）`,
+      x: padding,
+      y,
+      height: 54,
+      size: 30,
+      weight: 700,
+      color: level.stars === 5 ? '#C2410C' : level.stars === 4 ? '#1E5AA8' : '#1F2937',
+      align: 'left',
+    });
+    const tokens = level.classes.length
+      ? level.classes.map((entry) => (level.stars === 5 ? entry.label : `${entry.label}（-${entry.deduction}）`))
+      : ['无'];
+    for (const line of wrapTokens(tokens, maxChars)) {
+      push({
+        type: 'entry',
+        text: line,
+        x: padding + 24,
+        y,
+        height: 42,
+        size: 24,
+        weight: 400,
+        color: '#1F2937',
+        align: 'left',
+      });
+    }
+    y += 14;
+  }
+
+  push({
+    type: 'total',
+    text: `共 ${rating.totals.classCount} 个班级 · 本周合计扣 ${rating.totals.deduction} 分 · ${rating.totals.recordCount} 条检查记录`,
+    x: padding,
+    y,
+    height: 58,
+    size: 26,
+    weight: 700,
+    color: '#C00000',
+    align: 'left',
+  });
+  return { width, height: Math.ceil(y + padding), rows, rating };
 }
 
 export function buildImagePlan(records, date, options = {}) {
@@ -142,6 +240,13 @@ export function drawImagePlan(canvas, plan) {
 export function renderSummaryBlob(records, date, moduleId = 'daily') {
   const plan = moduleId === 'flag' ? buildFlagImagePlan(records, date) : buildImagePlan(records, date);
   if (!plan) return Promise.resolve(null);
+  const canvas = document.createElement('canvas');
+  drawImagePlan(canvas, plan);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
+export function renderRatingBlob(records, campus, mondayIso) {
+  const plan = buildRatingImagePlan(records, campus, mondayIso);
   const canvas = document.createElement('canvas');
   drawImagePlan(canvas, plan);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
