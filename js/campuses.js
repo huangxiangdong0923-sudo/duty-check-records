@@ -18,8 +18,7 @@ export const CAMPUSES = [
     label: '南校区',
     shortLabel: '值日检查南',
     grades: [5, 6],
-    // TODO: 待老师确认南校区五、六年级各自的班级数
-    classCounts: { 5: 6, 6: 6 },
+    classCounts: { 5: 18, 6: 18 },
     grounds: [
       { code: 'south-field', label: '操场', gradesLabel: '五、六年级', grades: [5, 6] },
     ],
