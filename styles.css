@@ -35,9 +35,6 @@ fieldset input { width: auto; margin: 0; }
 .message { color: var(--red); min-height: 24px; }
 .message.is-ok { color: var(--green); font-weight: 600; }
 .ground-chip { margin: 4px 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--blue-soft); color: var(--blue); font-size: 15px; font-weight: 600; }
-.sync-chip { margin: 8px 0 0; padding: 6px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.18); color: #FFFFFF; font-size: 14px; font-weight: 600; }
-.sync-chip[data-tone="ok"] { background: rgba(255, 255, 255, 0.28); }
-.sync-chip[data-tone="off"], .sync-chip[data-tone="error"] { background: rgba(255, 214, 102, 0.9); color: #5B3A00; }
 .hint { margin: -4px 0 12px; color: var(--muted); font-size: 14px; }
 .record-list { display: grid; gap: 8px; }
 .record-item, .summary-class { background: #FFFFFF; border: 1px solid var(--line); border-radius: 14px; padding: 12px; }

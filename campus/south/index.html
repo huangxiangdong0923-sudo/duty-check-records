@@ -22,7 +22,6 @@
       <button type="button" class="tab" data-tab="rating">星级评比</button>
       <button type="button" class="tab" data-tab="history">历史与备份</button>
     </nav>
-    <p id="sync-chip" class="sync-chip" hidden></p>
   </header>
 
   <main>
@@ -130,15 +129,6 @@
       <h2>版本</h2>
       <p id="app-version" class="hint"></p>
       <button id="check-update" type="button">检查更新</button>
-      <h2>云同步</h2>
-      <p class="hint">把记录存到你自己的私有 GitHub 仓库，手机上的 App、手机浏览器、电脑浏览器看到的就是同一份数据。每台设备、每个入口只需粘贴一次令牌。</p>
-      <label>访问令牌
-        <input id="sync-token" type="password" inputmode="text" autocomplete="off" spellcheck="false" placeholder="粘贴 GitHub 令牌">
-      </label>
-      <button id="sync-save" type="button" class="primary">保存令牌并立即同步</button>
-      <button id="sync-now" type="button">立即同步</button>
-      <button id="sync-clear" type="button">清除令牌</button>
-      <p id="sync-status" class="message" role="status"></p>
     </section>
   </main>
 

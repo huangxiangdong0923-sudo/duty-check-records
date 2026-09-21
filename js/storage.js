@@ -1,8 +1,6 @@
 import { normalizeRecord } from './records.js';
 
 export const STORAGE_KEY = 'duty-deduction-records-v1';
-// 删除记录后留下 id 记号，云同步时才能把删除同步到其它设备。
-export const TOMBSTONE_KEY = 'duty-check-tombstones-v1';
 
 export function loadRecords(storage = globalThis.localStorage) {
   const raw = storage.getItem(STORAGE_KEY);
@@ -15,27 +13,6 @@ export function loadRecords(storage = globalThis.localStorage) {
 export function saveRecords(records, storage = globalThis.localStorage) {
   storage.setItem(STORAGE_KEY, JSON.stringify(records.map(normalizeRecord)));
   return records;
-}
-
-export function loadTombstones(storage = globalThis.localStorage) {
-  const raw = storage.getItem(TOMBSTONE_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveTombstones(ids, storage = globalThis.localStorage) {
-  const unique = Array.from(new Set((ids || []).map(String))).sort();
-  storage.setItem(TOMBSTONE_KEY, JSON.stringify(unique));
-  return unique;
-}
-
-export function addTombstone(ids, id) {
-  return Array.from(new Set([...(ids || []).map(String), String(id)])).sort();
 }
 
 export function createBackup(records, now = new Date().toISOString()) {
