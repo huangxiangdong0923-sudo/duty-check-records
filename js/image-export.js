@@ -1,5 +1,5 @@
 import { summarize, getTotals, summarizeFlag, formatFlagItemText } from './summary.js';
-import { WEEKLY_FULL_SCORE, rateWeek } from './rating.js';
+import { WEEKLY_FULL_SCORE, rateRange } from './rating.js';
 
 function formatDateTitle(date, suffix = '值日检查扣分情况') {
   const [, month, day] = date.split('-').map(Number);
@@ -44,8 +44,8 @@ export function wrapTokens(tokens, maxChars, separator = '  ') {
   return lines;
 }
 
-export function buildRatingImagePlan(records, campus, mondayIso, options = {}) {
-  const rating = rateWeek(records, campus, mondayIso);
+export function buildRatingImagePlan(records, campus, range, options = {}) {
+  const rating = rateRange(records, campus, range);
   const width = options.width || 1080;
   const padding = options.padding || 64;
   const rows = [];
@@ -113,7 +113,7 @@ export function buildRatingImagePlan(records, campus, mondayIso, options = {}) {
 
   push({
     type: 'total',
-    text: `共 ${rating.totals.classCount} 个班级 · 本周合计扣 ${rating.totals.deduction} 分 · ${rating.totals.recordCount} 条检查记录`,
+    text: `共 ${rating.totals.classCount} 个班级 · 合计扣 ${rating.totals.deduction} 分 · ${rating.totals.recordCount} 条检查记录`,
     x: padding,
     y,
     height: 58,
@@ -245,8 +245,8 @@ export function renderSummaryBlob(records, date, moduleId = 'daily') {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
-export function renderRatingBlob(records, campus, mondayIso) {
-  const plan = buildRatingImagePlan(records, campus, mondayIso);
+export function renderRatingBlob(records, campus, range) {
+  const plan = buildRatingImagePlan(records, campus, range);
   const canvas = document.createElement('canvas');
   drawImagePlan(canvas, plan);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));

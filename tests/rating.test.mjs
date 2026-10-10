@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WEEKLY_FULL_SCORE, rateWeek, scoreFor, starLevelFor, weekRange } from '../js/rating.js';
+import { WEEKLY_FULL_SCORE, countDays, normalizeRange, rateRange, rateWeek, scoreFor, starLevelFor, weekRange } from '../js/rating.js';
 import { getCampus } from '../js/campuses.js';
 
 const EAST = getCampus('east');
@@ -14,6 +14,42 @@ test('week range runs Monday to Friday', () => {
   assert.deepEqual(weekRange('2026-09-21'), { start: '2026-09-21', end: '2026-09-25' });
   assert.deepEqual(weekRange('2026-09-24'), { start: '2026-09-21', end: '2026-09-25' });
   assert.deepEqual(weekRange('2026-09-27'), { start: '2026-09-21', end: '2026-09-25' });
+});
+
+test('a custom range can be any number of days', () => {
+  assert.deepEqual(normalizeRange('2026-09-01', '2026-09-30'), { start: '2026-09-01', end: '2026-09-30' });
+  assert.deepEqual(normalizeRange('2026-09-30', '2026-09-01'), { start: '2026-09-01', end: '2026-09-30' });
+  assert.deepEqual(normalizeRange('2026-09-10', '2026-09-10'), { start: '2026-09-10', end: '2026-09-10' });
+  assert.equal(countDays({ start: '2026-09-10', end: '2026-09-10' }), 1);
+  assert.equal(countDays({ start: '2026-09-01', end: '2026-09-30' }), 30);
+  assert.equal(countDays({ start: '2026-09-21', end: '2026-09-25' }), 5);
+});
+
+test('a custom range only counts the days inside it', () => {
+  const records = [
+    record('inside', '2026-09-09', 3, 1, 2),
+    record('before', '2026-09-01', 3, 1, 5),
+    record('after', '2026-09-21', 3, 1, 5),
+    record('weekend-inside', '2026-09-12', 3, 2, 3),
+  ];
+  const result = rateRange(records, EAST, { start: '2026-09-07', end: '2026-09-13' });
+  const find = (label) => result.classes.find((entry) => entry.label === label);
+  assert.deepEqual(result.range, { start: '2026-09-07', end: '2026-09-13' });
+  assert.equal(result.totals.recordCount, 2);
+  assert.equal(find('三年级1班').deduction, 2);
+  assert.equal(find('三年级1班').stars, 4);
+  assert.equal(find('三年级2班').stars, 3);
+});
+
+test('a single-day range works and a reversed range is fixed', () => {
+  const records = [record('a', '2026-09-09', 3, 1, 3)];
+  const oneDay = rateRange(records, EAST, { start: '2026-09-09', end: '2026-09-09' });
+  assert.equal(oneDay.totals.recordCount, 1);
+  assert.equal(oneDay.classes.find((entry) => entry.label === '三年级1班').stars, 3);
+
+  const reversed = rateRange(records, EAST, { start: '2026-09-30', end: '2026-09-01' });
+  assert.deepEqual(reversed.range, { start: '2026-09-01', end: '2026-09-30' });
+  assert.equal(reversed.totals.recordCount, 1);
 });
 
 test('star levels follow the school rule', () => {

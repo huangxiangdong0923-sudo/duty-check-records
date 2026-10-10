@@ -1,5 +1,5 @@
 // 每次改动前端文件都要把 CACHE 版本号加一，否则手机上的离线缓存不会更新。
-const CACHE = 'duty-check-v8';
+const CACHE = 'duty-check-v9';
 const ASSETS = [
   './',
   './index.html',

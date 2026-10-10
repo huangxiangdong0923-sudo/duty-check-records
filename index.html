@@ -101,14 +101,18 @@
     </section>
 
     <section id="panel-rating" class="panel">
-      <h2 id="rating-title">本周星级班级评比</h2>
-      <label>选择这一周（点任意一天）
-        <input id="rating-week" type="date">
+      <h2 id="rating-title">星级班级评比</h2>
+      <label>开始日期
+        <input id="rating-start" type="date">
       </label>
+      <label>结束日期
+        <input id="rating-end" type="date">
+      </label>
+      <p class="hint">起止日期由你自己选，几天都行：一个学期、一个月、某一周，或者只统计某几天。</p>
       <p id="rating-range" class="hint"></p>
       <div id="rating-total" class="summary-total"></div>
       <p id="rating-message" class="message" role="status"></p>
-      <button id="export-rating" type="button" class="primary">导出本周评比图片</button>
+      <button id="export-rating" type="button" class="primary">导出评比图片</button>
       <div id="rating-groups" class="summary-groups"></div>
     </section>
 

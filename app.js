@@ -5,7 +5,7 @@ import { summarize, getTotals, summarizeFlag, flagItemLocationText } from './js/
 import { renderSummaryBlob, renderRatingBlob, downloadBlob } from './js/image-export.js';
 import { todayIso, lastMondayIso, formatChipDateWithWeekday } from './js/dates.js';
 import { DEFAULT_CAMPUS, detectCampusId, filterByCampus, getCampus } from './js/campuses.js';
-import { rateWeek } from './js/rating.js';
+import { countDays, normalizeRange, rateRange, weekRange } from './js/rating.js';
 import { hasSyncToken, loadSyncSettings, saveSyncSettings, syncNow, formatClock } from './js/sync.js';
 import { APP_VERSION, APP_UPDATED_AT } from './js/version.js';
 
@@ -320,15 +320,25 @@ async function exportSummaryImage() {
   setMessage('summary-message', '图片已生成并开始下载。', true);
 }
 
-function ratingMonday() {
-  return lastMondayIso($('rating-week').value || todayIso());
+// 起止日期由老师自己选；不填就默认本周一至周五。
+function currentRatingRange() {
+  const fallback = weekRange();
+  return normalizeRange($('rating-start').value || fallback.start, $('rating-end').value || fallback.end);
+}
+
+function syncRatingRangeInputs(range) {
+  $('rating-start').value = range.start;
+  $('rating-end').value = range.end;
 }
 
 function renderRating() {
-  const rating = rateWeek(campusRecords(), CAMPUS, ratingMonday());
-  $('rating-title').textContent = `${CAMPUS.label}本周星级班级评比`;
-  $('rating-range').textContent = `统计范围：${formatChipDateWithWeekday(rating.range.start)} 至 ${formatChipDateWithWeekday(rating.range.end)}（周一至周五）`;
-  $('rating-total').textContent = `本周共 ${rating.totals.classCount} 个班级 · 合计扣 ${rating.totals.deduction} 分 · ${rating.totals.recordCount} 条检查记录`;
+  const startValue = $('rating-start').value;
+  const endValue = $('rating-end').value;
+  const rating = rateRange(campusRecords(), CAMPUS, currentRatingRange());
+  $('rating-title').textContent = `${CAMPUS.label}星级班级评比`;
+  const reversed = Boolean(startValue && endValue && startValue > endValue);
+  $('rating-range').textContent = `统计范围：${formatChipDateWithWeekday(rating.range.start)} 至 ${formatChipDateWithWeekday(rating.range.end)}（共 ${countDays(rating.range)} 天）${reversed ? '，起止日期填反了，已自动调换' : ''}`;
+  $('rating-total').textContent = `统计范围内共 ${rating.totals.classCount} 个班级 · 合计扣 ${rating.totals.deduction} 分 · ${rating.totals.recordCount} 条检查记录`;
   setMessage('rating-message', '');
 
   const container = $('rating-groups');
@@ -367,19 +377,19 @@ function renderRating() {
   if (rating.totals.uncheckedCount) {
     const note = document.createElement('p');
     note.className = 'rating-rule';
-    note.textContent = `说明：其中 ${rating.totals.uncheckedCount} 个班级本周还没有检查记录，按未被扣分计为五星。`;
+    note.textContent = `说明：其中 ${rating.totals.uncheckedCount} 个班级在这个范围里还没有检查记录，按未被扣分计为五星。`;
     container.appendChild(note);
   }
 }
 
 async function exportRatingImage() {
-  const mondayIso = ratingMonday();
-  const rating = rateWeek(campusRecords(), CAMPUS, mondayIso);
+  const range = currentRatingRange();
+  const rating = rateRange(campusRecords(), CAMPUS, range);
   if (!rating.totals.recordCount) {
-    setMessage('rating-message', '这一周还没有检查记录，暂不能导出图片。');
+    setMessage('rating-message', '这个范围里还没有检查记录，暂不能导出图片。');
     return;
   }
-  const blob = await renderRatingBlob(campusRecords(), CAMPUS, mondayIso);
+  const blob = await renderRatingBlob(campusRecords(), CAMPUS, rating.range);
   if (!blob) {
     setMessage('rating-message', '图片生成失败，请重试。');
     return;
@@ -565,7 +575,7 @@ function initEntry() {
   fillSlotOptions();
   $('f-date').value = defaultDateFor(state.moduleId);
   $('summary-date').value = defaultDateFor(state.moduleId);
-  $('rating-week').value = lastMondayIso();
+  syncRatingRangeInputs(weekRange());
   updateLocationFields();
   updateModuleVisibility();
   updateGroundChip();
@@ -596,7 +606,8 @@ function initEntry() {
     state.summaryDateTouched = true;
     renderSummary();
   });
-  $('rating-week').addEventListener('change', renderRating);
+  $('rating-start').addEventListener('change', renderRating);
+  $('rating-end').addEventListener('change', renderRating);
   $('export-image').addEventListener('click', exportSummaryImage);
   $('export-rating').addEventListener('click', exportRatingImage);
   $('export-backup').addEventListener('click', exportBackup);
