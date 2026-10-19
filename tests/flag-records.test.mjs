@@ -36,6 +36,34 @@ test('invalid student numbers are reported', () => {
 test('default points follow how many students were recorded', () => {
   assert.equal(defaultPointsFor('3 7 12'), 3);
   assert.equal(defaultPointsFor(''), 1);
+  assert.equal(defaultPointsFor('', 4), 4);
+  assert.equal(defaultPointsFor('', null), 1);
+});
+
+test('flag draft can record a headcount without student numbers', () => {
+  const draft = { ...baseFlagDraft, studentNos: '', studentCount: 4, points: 4 };
+  assert.equal(validateDraft(draft).valid, true);
+  const record = createRecord(draft, {
+    now: () => '2026-09-21T02:00:00.000Z',
+    idFactory: () => 'flag-count-1',
+  });
+  assert.deepEqual(record.studentNos, []);
+  assert.equal(record.studentCount, 4);
+  assert.equal(record.points, 4);
+});
+
+test('flag draft rejects a bad headcount and mixing headcount with student numbers', () => {
+  for (const studentCount of [0, 3.5, 100]) {
+    assert.equal(validateDraft({ ...baseFlagDraft, studentNos: '', studentCount }).valid, false, `studentCount=${studentCount}`);
+  }
+  const mixed = validateDraft({ ...baseFlagDraft, studentNos: '3 7', studentCount: 2 });
+  assert.equal(mixed.valid, false);
+  assert.ok(mixed.errors.includes('学号和人数只能填一种'));
+});
+
+test('old records without a headcount stay unchanged', () => {
+  const record = normalizeRecord({ ...baseFlagDraft, studentCount: undefined });
+  assert.equal('studentCount' in record, false);
 });
 
 test('flag draft saves with student numbers', () => {

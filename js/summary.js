@@ -57,9 +57,15 @@ export function formatStudentNoList(studentNos) {
 
 export function flagItemLocationText(item) {
   const nos = formatStudentNoList(item.studentNos);
-  if (nos && item.classLevel) return `${nos} 号及整班`;
-  if (nos) return `${nos} 号`;
-  return '整班';
+  const people = Number(item.studentCount) || 0;
+  const parts = [];
+  if (nos) parts.push(`${nos} 号`);
+  if (people > 0) parts.push(`${people} 人`);
+  if (item.classLevel) parts.push('整班');
+  if (!parts.length) return '整班';
+  if (parts.length === 1) return parts[0];
+  if (item.classLevel) return `${parts.slice(0, -1).join('、')}及整班`;
+  return parts.join('、');
 }
 
 export function formatFlagItemText(item) {
@@ -104,6 +110,7 @@ export function summarizeFlag(records, date) {
         reasonCode: reasonKey,
         reasonLabel: record.reasonLabel || '未填写原因',
         studentNos: [],
+        studentCount: 0,
         classLevel: false,
         points: 0,
         count: 0,
@@ -112,6 +119,7 @@ export function summarizeFlag(records, date) {
     const item = classGroup.itemMap.get(reasonKey);
     const nos = (record.studentNos || []).map((value) => String(Number(value)));
     if (nos.length) item.studentNos.push(...nos);
+    else if (Number(record.studentCount) > 0) item.studentCount += Number(record.studentCount);
     else item.classLevel = true;
     item.points += Number(record.points || 1);
     item.count += 1;

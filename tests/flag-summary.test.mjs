@@ -72,6 +72,28 @@ test('flag summary mixes class level and student numbers in one line', () => {
   assert.equal(formatFlagItemText(grounds[0].classes[0].items[0]), '未穿着规范校服：5 号及整班（2分）');
 });
 
+test('flag summary adds up headcounts when student numbers are unknown', () => {
+  const counted = [
+    flagRecord('c1', { studentNos: [], studentCount: 3, points: 3 }),
+    flagRecord('c2', { studentNos: [], studentCount: 2, points: 2 }),
+  ];
+  const { grounds } = summarizeFlag(counted, '2026-09-21');
+  const item = grounds[0].classes[0].items[0];
+  assert.equal(item.studentCount, 5);
+  assert.equal(item.classLevel, false);
+  assert.equal(flagItemLocationText(item), '5 人');
+  assert.equal(formatFlagItemText(item), '未佩戴红领巾：5 人（5分）');
+});
+
+test('a headcount and a class level record show together', () => {
+  const mixed = [
+    flagRecord('h1', { studentNos: [], points: 1 }),
+    flagRecord('h2', { studentNos: [], studentCount: 2, points: 2 }),
+  ];
+  const { grounds } = summarizeFlag(mixed, '2026-09-21');
+  assert.equal(flagItemLocationText(grounds[0].classes[0].items[0]), '2 人及整班');
+});
+
 test('playgrounds without deductions stay out of the summary', () => {
   const onlyGrade3 = [flagRecord('g3', { grade: 3, classNo: 5, studentNos: ['2'], points: 1 })];
   const { grounds } = summarizeFlag(onlyGrade3, '2026-09-21');

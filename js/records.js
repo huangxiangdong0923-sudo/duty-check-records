@@ -44,13 +44,21 @@ export function parseStudentNos(raw) {
   return Array.from(seen).sort((a, b) => Number(a) - Number(b));
 }
 
-export function defaultPointsFor(studentNos) {
+export function defaultPointsFor(studentNos, studentCount = null) {
   const count = parseStudentNos(studentNos).length;
-  return count > 0 ? count : 1;
+  if (count > 0) return count;
+  const people = Number(studentCount);
+  return Number.isInteger(people) && people > 0 ? people : 1;
+}
+
+export function normalizeStudentCount(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : null;
 }
 
 export function normalizeRecord(input) {
-  return {
+  const record = {
     id: String(input.id || makeId()),
     campus: getCampus(input.campus).id,
     module: moduleOf(input.module),
@@ -70,6 +78,10 @@ export function normalizeRecord(input) {
     createdAt: String(input.createdAt || new Date().toISOString()),
     updatedAt: String(input.updatedAt || input.createdAt || new Date().toISOString()),
   };
+  // 老记录没有这个字段，留空就不写，保证旧数据原样读写。
+  const studentCount = normalizeStudentCount(input.studentCount);
+  if (studentCount !== null) record.studentCount = studentCount;
+  return record;
 }
 
 export function validateDraft(draft) {
@@ -88,6 +100,13 @@ export function validateDraft(draft) {
     const invalid = findInvalidStudentNos(draft.studentNos);
     if (invalid.length) errors.push(`学号必须是 1-3 位数字：${invalid.join('、')}`);
     if (studentNoTokens(draft.studentNos).length > MAX_STUDENT_NOS) errors.push(`一次最多登记 ${MAX_STUDENT_NOS} 个学号`);
+    const hasNos = studentNoTokens(draft.studentNos).length > 0;
+    const hasCount = draft.studentCount !== null && draft.studentCount !== undefined && draft.studentCount !== '';
+    if (hasNos && hasCount) errors.push('学号和人数只能填一种');
+    if (hasCount) {
+      const people = Number(draft.studentCount);
+      if (!Number.isInteger(people) || people < 1 || people > 99) errors.push('有问题的人数必须是 1-99 的整数');
+    }
   } else {
     if (draft.locationType === 'student') {
       if (!String(draft.studentName || '').trim()) errors.push('请填写学生姓名');

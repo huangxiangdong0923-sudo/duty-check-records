@@ -111,10 +111,21 @@ function updateModuleVisibility() {
   const isFlag = state.moduleId === 'flag';
   $('daily-only').hidden = isFlag;
   $('flag-fields').hidden = !isFlag;
+  if (isFlag) updateFlagFields();
   document.querySelectorAll('.module').forEach((button) => {
     button.classList.toggle('is-active', button.dataset.module === state.moduleId);
   });
   $('summary-title').textContent = `${currentModule().label}汇总`;
+}
+
+function flagMode() {
+  return document.querySelector('input[name="flagMode"]:checked')?.value === 'count' ? 'count' : 'studentNos';
+}
+
+function updateFlagFields() {
+  const isCount = flagMode() === 'count';
+  $('flag-student-no-fields').hidden = isCount;
+  $('flag-count-fields').hidden = !isCount;
 }
 
 function renderReasons() {
@@ -141,7 +152,11 @@ function renderReasons() {
 
 function syncAutoPoints() {
   if (state.pointsDirty) return;
-  $('f-points').value = String(defaultPointsFor($('f-student-nos').value));
+  const isCount = flagMode() === 'count';
+  $('f-points').value = String(defaultPointsFor(
+    isCount ? '' : $('f-student-nos').value,
+    isCount ? $('f-student-count').value : null,
+  ));
 }
 
 function formDraft() {
@@ -157,7 +172,8 @@ function formDraft() {
     row: locationType === 'seat' ? Number($('f-row').value) : null,
     seat: locationType === 'seat' ? Number($('f-seat').value) : null,
     studentName: locationType === 'student' ? $('f-student').value : '',
-    studentNos: isFlag ? $('f-student-nos').value : [],
+    studentNos: isFlag && flagMode() === 'studentNos' ? $('f-student-nos').value : [],
+    studentCount: isFlag && flagMode() === 'count' ? $('f-student-count').value : null,
     slot: $('f-slot').value,
     reasonCode: state.selectedReasonCode || '',
     points: Number($('f-points').value || 1),
@@ -169,7 +185,9 @@ function locationText(record) {
   if (record.locationType === 'student') return record.studentName || '学生';
   if (record.locationType === 'studentNo') {
     const nos = parseStudentNos(record.studentNos);
-    return nos.length ? `${nos.join('、')} 号` : '整班';
+    if (nos.length) return `${nos.join('、')} 号`;
+    if (Number(record.studentCount) > 0) return `${record.studentCount} 人`;
+    return '整班';
   }
   return `第${record.row}排第${record.seat}个`;
 }
@@ -222,6 +240,7 @@ function switchModule(moduleId) {
   state.selectedReasonCode = null;
   state.pointsDirty = false;
   $('f-student-nos').value = '';
+  $('f-student-count').value = '';
   $('f-points').value = '1';
   fillSlotOptions();
   updateModuleVisibility();
@@ -563,6 +582,7 @@ function resetEntryForm() {
   $('f-note').value = '';
   $('f-points').value = '1';
   $('f-student-nos').value = '';
+  $('f-student-count').value = '';
   renderReasons();
 }
 
@@ -594,6 +614,11 @@ function initEntry() {
     renderReasons();
   });
   $('f-student-nos').addEventListener('input', syncAutoPoints);
+  $('f-student-count').addEventListener('input', syncAutoPoints);
+  document.querySelectorAll('input[name="flagMode"]').forEach((input) => input.addEventListener('change', () => {
+    updateFlagFields();
+    syncAutoPoints();
+  }));
   $('f-points').addEventListener('input', () => {
     state.pointsDirty = true;
   });
