@@ -13,6 +13,14 @@ test('slot lookup returns slot-specific and shared reasons', () => {
   assert.ok(!codes.includes('eye-not-do'));
 });
 
+test('hygiene tools are checked in both the morning and the afternoon', () => {
+  assert.ok(getReasonsForSlot('morning').some((reason) => reason.label === '卫生工具摆放不整齐'));
+  assert.ok(getReasonsForSlot('afternoon').some((reason) => reason.label === '卫生工具摆放不整齐'));
+  assert.ok(!getReasonsForSlot('eye').some((reason) => reason.label === '卫生工具摆放不整齐'));
+  assert.equal(getReasonByCode('hygiene-tools-am').slot, 'morning');
+  assert.equal(getReasonByCode('hygiene-tools-pm').slot, 'afternoon');
+});
+
 test('other reason requires a note', () => {
   assert.equal(getReasonByCode('other').requiresNote, true);
 });
